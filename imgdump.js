@@ -1,13 +1,26 @@
 var https = require('https');
+var http = require('http');
+var method = http;
 var san = require("sanitize-filename");
 var fs = require('fs');
 var crypto = require('crypto');
-var privKey = fs.readFileSync( "/etc/letsencrypt/live/illegible.us/privkey.pem");
-var cert = fs.readFileSync("/etc/letsencrypt/live/illegible.us/cert.pem");
-var outDir = "/var/www/oversightmachin.es/html/findings/";
 var moment = require("moment");
 var hearingsFile = "/var/www/oversightmachin.es/html/oversee/data/data.json";
 var hearings = JSON.parse(fs.readFileSync(hearingsFile));
+
+var settings = fs.readFileSync("settings.json");
+var outDir = settings.outDir;
+var hearingsFile = settings.hearingsFile;
+var encrypt;
+var serverOpts = {};
+
+if (settings.privkey && settings.cert){
+    encrypt = true;
+    method = https;
+    serverOpts.key = fs.readFileSync(settings.privKey);
+    serverOpts.cert = fs.readFileSync(settings.cert);
+}
+
 
 
 var addPage = function(title,page){
@@ -27,7 +40,7 @@ var addPage = function(title,page){
 };
 
 
-var server = https.createServer({ key: privKey, cert: cert}, function(req, res) {
+var server = method.createServer(serverOpts, function(req, res) {
     console.log(moment().format());
     console.dir(req.param);
 
@@ -48,7 +61,7 @@ res.setHeader('Access-Control-Allow-Headers', '*');
                processSpu(inData);
             } else {
             console.log(inData.title, inData.root);
-            var ip = req.connection.remoteAddress;
+            var ip = req.socket.remoteAddress;
             var hash = crypto.createHash('md5').update(ip + new Date().toTimeString()).digest('hex');
 	 
             if (inData.pageImg){
