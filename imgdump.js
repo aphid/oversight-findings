@@ -5,7 +5,7 @@ var san = require("sanitize-filename");
 var fs = require('fs');
 var crypto = require('crypto');
 var moment = require("moment");
-
+var png = require('png-metadata');
 var settings = fs.readFileSync("settings.json");
 settings = JSON.parse(settings);
 console.log(settings);
@@ -17,9 +17,9 @@ console.log(hearingsFile)
 var hearings = JSON.parse(fs.readFileSync(hearingsFile));
 
 var dirs = ["ocr", "spu", "unburn"];
-for (let d of dirs){
+for (let d of dirs) {
     let target = outDir + "/" + d;
-    if (!fs.existsSync(target)){
+    if (!fs.existsSync(target)) {
         fs.mkdirSync(target);
     }
 }
@@ -34,7 +34,7 @@ if (settings.privkey && settings.cert) {
 
 
 
-var addPage = function (title, page) {
+var addPage = function(title, page) {
     for (let h of hearings.hearings) {
         for (let w of h.witnesses) {
             for (let p of w.pdfs) {
@@ -51,7 +51,7 @@ var addPage = function (title, page) {
 };
 
 
-var server = method.createServer(serverOpts, function (req, res) {
+var server = method.createServer(serverOpts, function(req, res) {
     console.log(moment().format());
     console.dir(req.param);
 
@@ -63,13 +63,12 @@ var server = method.createServer(serverOpts, function (req, res) {
     if (req.method == 'POST') {
         console.log("POST");
         var body = '';
-        req.on('data', function (data) {
+        req.on('data', function(data) {
             body += data.toString();
         });
-        req.on('end', function () {
+        req.on('end', function() {
             console.log(req.headers.referer);
-            if (req.headers.referer)
-            {
+            if (req.headers.referer) {
 
             }
             //need to determine which machine it is and pass it off to a handler
@@ -77,49 +76,91 @@ var server = method.createServer(serverOpts, function (req, res) {
             var inData = JSON.parse(body);
             if (inData.machine === "spu") {
                 processSpu(inData);
+            } else if (inData.machine === "unburn") {
+                //"machine":"unburn","mode":"d","time":32.64,"data":{"interval":102,"low":53,"high":151},"image":"
+                processUnburn(inData);
             } else {
                 console.log(inData.title, inData.root);
                 var ip = req.socket.remoteAddress;
                 var hash = crypto.createHash('md5').update(ip + new Date().toTimeString()).digest('hex');
 
                 if (inData.pageImg) {
-                    var out = outDir + san(inData.title + "_" + inData.page + ".png");
+                    var out = outDir + "ocr/" + san(inData.title + "_" + inData.page + ".png");
                     console.log(out);
                     var img = inData.pageImg.replace(/^data:image\/png;base64,/, "");
                     fs.writeFileSync(out, img, 'base64');
                     addPage(inData.title, inData.page);
                 } else if (inData.words) {
-                    var out = outDir + san(inData.title + "_" + inData.page + ".json");
+                    var out = outDir + "ocr/" + san(inData.title + "_" + inData.page + ".json");
                     fs.writeFileSync(out, JSON.stringify(inData, undefined, 2), "utf8");
                 }
             }
         });
-        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.writeHead(200, {
+            'Content-Type': 'text/html'
+        });
         res.end('post received');
-    }
-    else {
-        res.writeHead(200, { 'Content-Type': 'text/html' });
+    } else {
+        res.writeHead(200, {
+            'Content-Type': 'text/html'
+        });
         res.end('what');
     }
 
 });
 
+function processUnburn(data) {
+    //"machine":"unburn","mode":"d","time":32.64,"data":{"interval":102,"low":53,"high":151},"image":"
+    let id = `${data.unburnCode}_${data.mode}_${data.data.interval}_${data.data.low}_${data.data.high}_${data.time}`;
+    var out = `${outDir}unburn/${id}.png`;
+    console.log(id);
+    console.log(out);
+    var img = data.image.replace(/^data:image\/png;base64,/, "");
+
+    fs.writeFileSync(out, img, 'base64');
+    /* first attempt at writing metadata in image
+    let theimg = png.readFileSync(out);
+    var list = png.splitChunk(theimg);
+
+    // append
+    var iend = list.pop(); // remove IEND
+    var meta = [
+        png.createChunk("name", data.unburnCode),
+        png.createChunk("mode", data.mode),
+        png.createChunk("interval", data.data.interval),
+        png.createChunk("low", data.data.low),
+        png.createChunk("high", data.data.high),
+    ];
+    for (let m of meta) {
+        list.push(m);
+    }
+    list.push(iend);
+    var newpng = png.joinChunk(list);
+    fs.writeFileSync(out, newpng, 'binary');*/
+
+    //addPage(inData.title, inData.page);*/
+}
+
 function processSpu(data) {
-    for (let t of data.timestamps){
+    for (let t of data.timestamps) {
         t = parseFloat(t);
     }
     console.log(data);
-    var out = outDir + san(data.page + "_" + data.timestamps[0] + "_" + data.timestamps[1] + ".png");
+    var out = outDir + "spu/" + san(data.page + "_" + data.timestamps[0] + "_" + data.timestamps[1] + ".png");
     console.log("writing", out);
     var img = data.pageImg.replace(/^data:image\/png;base64,/, "");
     fs.writeFileSync(out, img, 'base64');
     var send = [];
-    var datafile = (outDir + data.page + ".json");
+    var datafile = (outDir + "spu/" + data.page + ".json");
     if (fs.existsSync(datafile)) {
         send = JSON.parse(fs.readFileSync(datafile));
     }
 
-    send.push({ timestamps: data.timestamps, measure: parseFloat(data.measure), threshold: data.threshold });
+    send.push({
+        timestamps: data.timestamps,
+        measure: parseFloat(data.measure),
+        threshold: data.threshold
+    });
     console.log(send);
     fs.writeFileSync(datafile, JSON.stringify(send));
 
