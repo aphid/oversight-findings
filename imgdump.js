@@ -26,6 +26,7 @@ for (let d of dirs) {
 
 
 if (settings.privkey && settings.cert) {
+    console.log("using https")
     encrypt = true;
     method = https;
     serverOpts.key = fs.readFileSync(settings.privKey);
