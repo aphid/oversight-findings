@@ -5,7 +5,7 @@ var san = require("sanitize-filename");
 var fs = require('fs');
 var crypto = require('crypto');
 var moment = require("moment");
-var png = require('png-metadata');
+var exif = require("exiftool-vendored").exiftool;
 var settings = fs.readFileSync("settings.json");
 settings = JSON.parse(settings);
 console.log(settings);
@@ -118,35 +118,38 @@ var server = method.createServer(serverOpts, function(req, res) {
 
 });
 
-function processUnburn(data) {
+async function processUnburn(data) {
     //"machine":"unburn","mode":"d","time":32.64,"data":{"interval":102,"low":53,"high":151},"image":"
     let id = `${data.unburnCode}_${data.mode}_${data.data.interval}_${data.data.low}_${data.data.high}_${data.time}`;
     var out = `${outDir}unburn/${id}.png`;
     console.log(id);
     console.log(out);
+    let md = JSON.parse(data.data.metadata);
+
     var img = data.image.replace(/^data:image\/png;base64,/, "");
 
     fs.writeFileSync(out, img, 'base64');
-    /* first attempt at writing metadata in image
-    let theimg = png.readFileSync(out);
-    var list = png.splitChunk(theimg);
+    var meta = {
+        "Title": "unburning " + data.unburnCode,
+        "Description": md.title,
+        "BaseURL": md.url,
+        "MetadataDate": md.metadata["fileModificationDate/Time"],
+        "AppInfoApplication": "unburn",
+        "AppInfoItemURI": `https://oversightmachin.es/unburn/d.html?id=${data.unburnCode}&`,
 
-    // append
-    var iend = list.pop(); // remove IEND
-    var meta = [
-        png.createChunk("name", data.unburnCode),
-        png.createChunk("mode", data.mode),
-        png.createChunk("interval", data.data.interval),
-        png.createChunk("low", data.data.low),
-        png.createChunk("high", data.data.high),
-    ];
-    for (let m of meta) {
-        list.push(m);
-    }
-    list.push(iend);
-    var newpng = png.joinChunk(list);
-    fs.writeFileSync(out, newpng, 'binary');*/
-
+        "StereoMode": data.mode,
+        "HistoryAction": "saved, created, saved, redacted, published, scraped, unburned, saved",
+        "HistoryChanged": "/, /, /metadata",
+        "Copyright": "Public Domain",
+        "ImageRegionRoleIdentifier": "abstraction against deputization",
+        "RecommendedExposureIndex": data.data.interval,
+        "Location": "Baltimore, MD",
+        "GradientBasedCorrRangeMaskDepthMin": data.data.low,
+        "GradientBasedCorrRangeMaskDepthMax": data.data.high
+    };
+    let ex = await exif.write(out, meta, ['-overwrite_original']);
+    exif.end();
+    console.log(ex);
     //addPage(inData.title, inData.page);*/
 }
 
