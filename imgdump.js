@@ -24,13 +24,15 @@ for (let d of dirs) {
     }
 }
 
-
-if (settings.privkey && settings.cert) {
+console.log(settings);
+if (settings.privKey && settings.cert) {
     console.log("using https")
     encrypt = true;
     method = https;
     serverOpts.key = fs.readFileSync(settings.privKey);
     serverOpts.cert = fs.readFileSync(settings.cert);
+} else {
+    console.log("using http");
 }
 
 
@@ -86,13 +88,19 @@ var server = method.createServer(serverOpts, function(req, res) {
                 var hash = crypto.createHash('md5').update(ip + new Date().toTimeString()).digest('hex');
 
                 if (inData.pageImg) {
-                    var out = outDir + "ocr/" + san(inData.title + "_" + inData.page + ".png");
-                    console.log(out);
+		    let fn = `${inData.title}_${inData.page}_${inData.mode}.png`;
+		    fn = san(fn);
+		    let out = outDir + "ocr/" + fn;
+                    //maybe add version # to mode?
+		    console.log(out);
                     var img = inData.pageImg.replace(/^data:image\/png;base64,/, "");
                     fs.writeFileSync(out, img, 'base64');
                     addPage(inData.title, inData.page);
                 } else if (inData.words) {
-                    var out = outDir + "ocr/" + san(inData.title + "_" + inData.page + ".json");
+	            var out = `${inData.title}_${inData.page}_${inData.mode}.json`;
+                    out = san(out);
+                    out = outDir + "ocr/" + out;
+
                     fs.writeFileSync(out, JSON.stringify(inData, undefined, 2), "utf8");
                 }
             }
