@@ -5,6 +5,7 @@ var san = require("sanitize-filename");
 var fs = require('fs');
 var crypto = require('crypto');
 var moment = require("moment");
+var axios = require('axios');
 var exif = require("exiftool-vendored").exiftool;
 var settings = fs.readFileSync("settings.json");
 settings = JSON.parse(settings);
@@ -24,15 +25,13 @@ for (let d of dirs) {
     }
 }
 
-console.log(settings);
-if (settings.privKey && settings.cert) {
+
+if (settings.privkey && settings.cert) {
     console.log("using https")
     encrypt = true;
     method = https;
     serverOpts.key = fs.readFileSync(settings.privKey);
     serverOpts.cert = fs.readFileSync(settings.cert);
-} else {
-    console.log("using http");
 }
 
 
@@ -83,26 +82,11 @@ var server = method.createServer(serverOpts, function(req, res) {
                 //"machine":"unburn","mode":"d","time":32.64,"data":{"interval":102,"low":53,"high":151},"image":"
                 processUnburn(inData);
             } else {
-                console.log(inData.title, inData.root);
-                var ip = req.socket.remoteAddress;
-                var hash = crypto.createHash('md5').update(ip + new Date().toTimeString()).digest('hex');
-
-                if (inData.pageImg) {
-		    let fn = `${inData.title}_${inData.page}_${inData.mode}.png`;
-		    fn = san(fn);
-		    let out = outDir + "ocr/" + fn;
-                    //maybe add version # to mode?
-		    console.log(out);
-                    var img = inData.pageImg.replace(/^data:image\/png;base64,/, "");
-                    fs.writeFileSync(out, img, 'base64');
-                    addPage(inData.title, inData.page);
-                } else if (inData.words) {
-	            var out = `${inData.title}_${inData.page}_${inData.mode}.json`;
-                    out = san(out);
-                    out = outDir + "ocr/" + out;
-
-                    fs.writeFileSync(out, JSON.stringify(inData, undefined, 2), "utf8");
-                }
+                let ip = req.socket.remoteAddress;
+                let timestamp = new Date().toTimeString();
+                inData.author = ip;
+                inData.timestamp = timestamp;
+                processOCR(inData);
             }
         });
         res.writeHead(200, {
@@ -124,16 +108,14 @@ async function processUnburn(data) {
     var out = `${outDir}unburn/${id}.png`;
     console.log(id);
     console.log(out);
-    let md = JSON.parse(data.data.metadata);
+    let md;
+
 
     var img = data.image.replace(/^data:image\/png;base64,/, "");
 
     fs.writeFileSync(out, img, 'base64');
     var meta = {
         "Title": "unburning " + data.unburnCode,
-        "Description": md.title,
-        "BaseURL": md.url,
-        "MetadataDate": md.metadata["fileModificationDate/Time"],
         "AppInfoApplication": "unburn",
         "AppInfoItemURI": `https://oversightmachin.es/unburn/d.html?id=${data.unburnCode}&`,
 
@@ -143,15 +125,119 @@ async function processUnburn(data) {
         "Copyright": "Public Domain",
         "ImageRegionRoleIdentifier": "abstraction against deputization",
         "RecommendedExposureIndex": data.data.interval,
-        "Location": "Baltimore, MD",
         "GradientBasedCorrRangeMaskDepthMin": data.data.low,
-        "GradientBasedCorrRangeMaskDepthMax": data.data.high
+        "GradientBasedCorrRangeMaskDepthMax": data.data.high,
+        "XMP-crd:WhiteBalance": "b7e",
+        "GPSAltitude": 1312,
+        "GPSAltitudeRef": 0,
+        "GPSAreaInformation": "Baltimore, MD",
+        "GPSLatitude": "39.2904",
+        "GPSLongitude": "76.6122"
     };
-    let ex = await exif.write(out, meta, ['-overwrite_original']);
-    exif.end();
+
+    if (data.data.metadata) {
+        let md = JSON.parse(data.data.metadata);
+        meta["Description"] = md.title;
+        meta["BaseURL"] = md.url;
+        meta["MetadataDate"] = md.metadata["fileModificationDate/Time"];
+    }
+    let ex = await exif.write(out, meta, ['-overwrite_original', '-n']);
     console.log(ex);
     //addPage(inData.title, inData.page);*/
 }
+
+
+async function processOCR(inData) {
+    console.log(inData.title, inData.root);
+    //var ip = req.socket.remoteAddress;
+    //var hash = crypto.createHash('md5').update(ip + new Date().toTimeString()).digest('hex');
+    //DO IMAGE
+    let reduced = [];
+    if (inData.pageImg) {
+        var out = outDir + "ocr/" + san(inData.title + "_" + inData.page + "_" + inData.mode + ".png");
+        console.log(out);
+        if (!fs.existsSync(out)) {
+            var img = inData.pageImg.replace(/^data:image\/png;base64,/, "");
+            fs.writeFileSync(out, img, 'base64');
+            console.log("writing ", out);
+            reduced = reduceWords(inData.words);
+            console.log("reduced: ", reduced);
+            let meta = {
+                "DerivedFromRenditionClass": JSON.stringify(reduced)
+            }
+            let ex = await exif.write(out, meta, ['-overwrite_original', '-n']);
+            addPage(inData.title, inData.page);
+        }
+    }
+    if (inData.words) {
+        console.log("WORDS");
+        var out = outDir + "ocr/" + san(inData.title + "_" + inData.page + "_" + inData.mode + ".json");
+        if (!fs.existsSync(out)) {
+
+            fs.writeFileSync(out, JSON.stringify({
+                "author": inData.author,
+                "timestamp": inData.timestamp,
+                "page": inData.page,
+                "root": this.root,
+                "title": inData.title,
+                "mode": inData.mode,
+                "reduced": reduced,
+                "words": inData.words
+
+            }, undefined, 2), "utf8");
+        }
+    } else {
+        console.log("no words");
+    }
+    await checkForCompletePDF(inData);
+}
+
+function reduceWords(input) {
+    let reduced = [];
+    for (let w of input) {
+        let p = w.potentials;
+        console.log(p.length, "potentials");
+        if (p.length == 1) {
+            if (p[0] !== undefined) {
+                reduced.push(p[0].word);
+            }
+        } else if (p.length > 1) {
+            let arr = [];
+            console.log(p);
+            for (let pot of p) {
+                console.log(pot.word);
+                arr.push(pot.word)
+            }
+            console.log(arr);
+            reduced.push(arr);
+        }
+    }
+    return reduced;
+}
+
+async function checkForCompletePDF(inData) {
+    let pdf = await pdfFromID(inData.title);
+    let pageCount = pdf.pageCount;
+    for (let i = 0; i < pageCount; i++) {
+        var out = outDir + "ocr/" + san(inData.title + "_" + i + "_" + inData.mode + ".png");
+        if (!fs.existsSync(out)) {
+            console.log("missing", out);
+            return false;
+        } else {
+            console.log("so far so good", out);
+        }
+    }
+    //if we got this far, make a PDF;
+}
+
+async function pdfFromID(title) {
+    let url = "https://oversightmachin.es/oversee/media/text/" + title + ".pdf.json";
+    let data = await axios(url);
+    return data.data;
+
+    console.log("no data", url);
+}
+
 
 function processSpu(data) {
     for (let t of data.timestamps) {
