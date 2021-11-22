@@ -26,7 +26,7 @@ for (let d of dirs) {
 }
 
 
-if (settings.privkey && settings.cert) {
+if (settings.privKey && settings.cert) {
     console.log("using https")
     encrypt = true;
     method = https;
@@ -154,6 +154,7 @@ async function processOCR(inData) {
     //DO IMAGE
     let reduced = [];
     if (inData.pageImg) {
+	console.log("IMAGE");
         var out = outDir + "ocr/" + san(inData.title + "_" + inData.page + "_" + inData.mode + ".png");
         console.log(out);
         if (!fs.existsSync(out)) {
