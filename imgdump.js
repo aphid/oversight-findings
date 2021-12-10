@@ -83,16 +83,17 @@ var server = method.createServer(serverOpts, function(req, res) {
                 processUnburn(inData);
             } else {
                 let ip = req.socket.remoteAddress;
-                let timestamp = new Date().toTimeString();
+                let timestamp = moment().format("YYYY:MM:DD HH:mm:s.SSZ");
                 inData.author = ip;
-                inData.timestamp = timestamp;
+                inData.DateTimeDigitized = timestamp;
                 processOCR(inData);
             }
+            res.writeHead(200, {
+                'Content-Type': 'text/html'
+            });
+            res.end('{status: "success"}');
         });
-        res.writeHead(200, {
-            'Content-Type': 'text/html'
-        });
-        res.end('post received');
+
     } else {
         res.writeHead(200, {
             'Content-Type': 'text/html'
@@ -132,7 +133,7 @@ async function processUnburn(data) {
         "GPSAltitudeRef": 0,
         "GPSAreaInformation": "Baltimore, MD",
         "GPSLatitude": "39.2904",
-        "GPSLongitude": "76.6122"
+        "GPSLongitude": "-76.6122"
     };
 
     if (data.data.metadata) {
@@ -153,20 +154,48 @@ async function processOCR(inData) {
     //var hash = crypto.createHash('md5').update(ip + new Date().toTimeString()).digest('hex');
     //DO IMAGE
     let reduced = [];
+    let hearing = await hearingFromID(inData.title);
+    console.log(hearing);
+    let witness = hearing.witness;
+    hearing = hearing.hearing;
+
+    let location;
+    if (hearing.location.includes("Hart")) {
+        location = [38.893056, -77.004167];
+    } else if (hearing.location.includes("Russell")) {
+        location = [38.892778, -77.006944];
+    } else if (hearing.location.includes("Dirksen")) {
+        location = [38.893056, -77.005278];
+    }
+
+
     if (inData.pageImg) {
-	console.log("IMAGE");
+        console.log("IMAGE");
         var out = outDir + "ocr/" + san(inData.title + "_" + inData.page + "_" + inData.mode + ".png");
         console.log(out);
-        if (!fs.existsSync(out)) {
+        if (!fs.existsSync(out) || 1 == 1) {
             var img = inData.pageImg.replace(/^data:image\/png;base64,/, "");
             fs.writeFileSync(out, img, 'base64');
             console.log("writing ", out);
             reduced = reduceWords(inData.words);
             console.log("reduced: ", reduced);
+            console.log(inData.timestamp);
             let meta = {
-                "DerivedFromRenditionClass": JSON.stringify(reduced)
+                "author": inData.author,
+                "timestamp": inData.timestamp,
+                "DerivedFromRenditionClass": JSON.stringify(reduced),
+                "ownerName": `${witness.title || ""} ${witness.firstName} ${witness.lastName}, ${witness.org || ""}`
+            }
+            if (location) {
+                meta["exif:GPSLatitude"] = location[0];
+                meta["exif:GPSLatitudeRef"] = "N";
+                meta["exif:GPSLongitude"] = location[1];
+                meta["exif:GPSLongitudeRef"] = "W";
+
+                //meta["GPSPosition"] = `${location[0]} ${location[1]}`;
             }
             let ex = await exif.write(out, meta, ['-overwrite_original', '-n']);
+            console.log(ex);
             addPage(inData.title, inData.page);
         }
     }
@@ -178,9 +207,12 @@ async function processOCR(inData) {
             fs.writeFileSync(out, JSON.stringify({
                 "author": inData.author,
                 "timestamp": inData.timestamp,
+                "HistoryChanged": "/, /, /metadata",
+                "Copyright": "Public Domain",
                 "page": inData.page,
                 "root": this.root,
-                "title": inData.title,
+                "DerivedFrom": inData.title,
+
                 "mode": inData.mode,
                 "reduced": reduced,
                 "words": inData.words
@@ -190,7 +222,14 @@ async function processOCR(inData) {
     } else {
         console.log("no words");
     }
-    await checkForCompletePDF(inData);
+    console.log("checking for full pdf");
+    let docComplete = await checkForCompletePDF(inData);
+    if (docComplete) {
+        console.log("doc is complete");
+    } else {
+        console.log("doc not complete");
+    }
+    console.log("finished");
 }
 
 function reduceWords(input) {
@@ -218,9 +257,10 @@ function reduceWords(input) {
 
 async function checkForCompletePDF(inData) {
     let pdf = await pdfFromID(inData.title);
-    let pageCount = pdf.pageCount;
+    let pageCount = pdf.pdfinfo.pages;
     for (let i = 0; i < pageCount; i++) {
         var out = outDir + "ocr/" + san(inData.title + "_" + i + "_" + inData.mode + ".png");
+        console.log("testing", out);
         if (!fs.existsSync(out)) {
             console.log("missing", out);
             return false;
@@ -233,18 +273,54 @@ async function checkForCompletePDF(inData) {
 
 async function pdfFromID(title) {
     let url = "https://oversightmachin.es/oversee/media/text/" + title + ".pdf.json";
-    let data = await axios(url);
+    console.log("fetching", url);
+    let data;
+    try {
+        data = await axios(url);
+    } catch (e) {
+        throw (e);
+    }
+    console.log("ok");
     return data.data;
 
     console.log("no data", url);
 }
+
+async function hearingFromID(title) {
+    let url = "https://oversightmachin.es/oversee/data/211201_07.json";
+    let data;
+    try {
+        data = await axios.get(url);
+    } catch (e) {
+        throw (e.response);
+    }
+    console.log(data.data);
+    for (let h of data.data.hearings) {
+        if (h.witnesses) {
+            for (let w of h.witnesses) {
+                if (w.pdfs) {
+                    for (let p of w.pdfs) {
+                        if (p.shortName === title) {
+                            return {
+                                hearing: h,
+                                witness: w
+                            };
+                        }
+                    }
+
+                }
+            }
+        }
+    }
+    console.log("no data", url);
+}
+
 
 
 function processSpu(data) {
     for (let t of data.timestamps) {
         t = parseFloat(t);
     }
-    console.log(data);
     var out = outDir + "spu/" + san(data.page + "_" + data.timestamps[0] + "_" + data.timestamps[1] + ".png");
     console.log("writing", out);
     var img = data.pageImg.replace(/^data:image\/png;base64,/, "");
