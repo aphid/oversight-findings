@@ -1,6 +1,7 @@
 var https = require('https');
 var http = require('http');
 var method = http;
+var pdfkit = require('pdfkit')
 var san = require("sanitize-filename");
 var fs = require('fs');
 var crypto = require('crypto');
@@ -258,8 +259,10 @@ function reduceWords(input) {
 async function checkForCompletePDF(inData) {
     let pdf = await pdfFromID(inData.title);
     let pageCount = pdf.pdfinfo.pages;
+    let pages = [];
     for (let i = 0; i < pageCount; i++) {
         var out = outDir + "ocr/" + san(inData.title + "_" + i + "_" + inData.mode + ".png");
+        pages.push(out);
         console.log("testing", out);
         if (!fs.existsSync(out)) {
             console.log("missing", out);
@@ -269,6 +272,20 @@ async function checkForCompletePDF(inData) {
         }
     }
     console.log("time to make a PDF");
+    let doc = new pdfkit({
+        autoFirstPage: false
+    });
+    doc.pipe(fs.createWriteStream(outDir + "ocr/" + san(inData.title + "_" + inData.mode + ".pdf")));
+
+    for (let page of pages) {
+        doc.addPage({
+            size: 'letter'
+        });
+        doc.image(page, 0, 0, {
+            fit: [doc.page.width, doc.page.height]
+        })
+    }
+    doc.end();
     //if we got this far, make a PDF;
 }
 
