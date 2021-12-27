@@ -281,6 +281,7 @@ async function checkForCompletePDF(inData) {
         doc.addPage({
             size: 'letter'
         });
+        doc.rect(0, 0, doc.page.width, doc.page.height).fill('#16161d'); //eigengrau background
         doc.image(page, 0, 0, {
             fit: [doc.page.width, doc.page.height]
         })
