@@ -3,6 +3,7 @@
     "axios": "^0.24.0",
     "exiftool-vendored": "^15.6.0",
     "moment": "^2.29.1",
+    "pdfkit": "^0.13.0",
     "sanitize-filename": "^1.6.3"
   }
 }
