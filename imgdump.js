@@ -268,11 +268,14 @@ async function checkForCompletePDF(inData) {
             console.log("so far so good", out);
         }
     }
+    console.log("time to make a PDF");
     //if we got this far, make a PDF;
 }
 
 async function pdfFromID(title) {
-    let url = "https://oversightmachin.es/oversee/media/text/" + title + ".pdf.json";
+    let hearing = await hearingFromID(title).hearing;
+    console.log(hearing);
+    let url = "https://oversightmachin.es/oversee/media/text/" + hearing.localName + ".json";
     console.log("fetching", url);
     let data;
     try {
