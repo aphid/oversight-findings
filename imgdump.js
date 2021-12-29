@@ -182,25 +182,24 @@ async function processOCR(inData) {
             reduced = reduceWords(inData.words);
             console.log("reduced: ", reduced);
             console.log(inData.timestamp);
-            meta = {
-                "author": inData.author,
-                "timestamp": inData.timestamp,
-                "DerivedFromRenditionClass": JSON.stringify(reduced),
-                "ownerName": `${witness.title || ""} ${witness.firstName} ${witness.lastName}, ${witness.org || ""}`
-            }
-            if (location) {
-                meta["exif:GPSLatitude"] = location[0];
-                meta["exif:GPSLatitudeRef"] = "N";
-                meta["exif:GPSLongitude"] = location[1];
-                meta["exif:GPSLongitudeRef"] = "W";
-
-                //meta["GPSPosition"] = `${location[0]} ${location[1]}`;
-            }
-            let ex = await exif.write(out, meta, ['-overwrite_original', '-n']);
-            console.log(ex);
-            addPage(inData.title, inData.page);
+            meta.author = inData.author;
+            meta.timestamp = inData.timestamp;
+            meta.DerivedFromRenditionClass = JSON.stringify(reduced);
+            meta.ownerName = `${witness.title || ""} ${witness.firstName} ${witness.lastName}, ${witness.org || ""}`;
         }
+        if (location) {
+            meta["exif:GPSLatitude"] = location[0];
+            meta["exif:GPSLatitudeRef"] = "N";
+            meta["exif:GPSLongitude"] = location[1];
+            meta["exif:GPSLongitudeRef"] = "W";
+
+            //meta["GPSPosition"] = `${location[0]} ${location[1]}`;
+        }
+        let ex = await exif.write(out, meta, ['-overwrite_original', '-n']);
+        console.log(ex);
+        addPage(inData.title, inData.page);
     }
+
     if (inData.words) {
         console.log("WORDS");
         var out = outDir + "ocr/" + san(inData.title + "_" + (inData.page + "").padStart(3, "0") + "_" + inData.mode + ".json");
@@ -304,6 +303,7 @@ async function checkForCompletePDF(inData, meta) {
     meta.DerivedFromRenditionClass = JSON.stringify(reduced);
 
     doc.end();
+    console.log(meta);
     let ex = await exif.write(pdfout, meta, ['-overwrite_original', '-n']);
     console.log(ex);
     //if we got this far, make a PDF;
