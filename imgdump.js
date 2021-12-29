@@ -301,7 +301,7 @@ async function pdfFromID(title) {
             }
         }
     }
-    if (!p) {
+    if (!found) {
         return false;
     }
     let url = "https://oversightmachin.es/oversee/media/text/" + found.localName + ".json";
