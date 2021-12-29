@@ -283,7 +283,8 @@ async function checkForCompletePDF(inData, meta) {
         autoFirstPage: false
     });
     let pdfout = outDir + "ocr/" + san(inData.title + "_" + inData.mode + ".pdf");
-    doc.pipe(fs.createWriteStream(pdfout));
+    let stream = fs.createWriteStream(pdfout);
+    doc.pipe(stream);
 
     for (let page of pages) {
         doc.addPage({
@@ -309,16 +310,17 @@ async function checkForCompletePDF(inData, meta) {
     pmeta.GPSLongitudeRef = meta["exif:GPSLongitudeRef"];
     //pdfout = pdfout.replace(".pdf", "_m.pdf");
     doc.end();
-    wait(5000);
     console.log(pmeta);
-    try {
-        let ex = await exif.write(pdfout, pmeta, ['-overwrite_original', '-n']);
-        console.log(ex);
-    } catch (e) {
-        console.log(e);
-        throw (e);
-    }
-    //if we got this far, make a PDF;
+    writeStream.on('finish', function() {
+        try {
+            let ex = await exif.write(pdfout, pmeta, ['-overwrite_original', '-n']);
+            console.log(ex);
+        } catch (e) {
+            console.log(e);
+            throw (e);
+        }
+        //if we got this far, make a PDF;
+    });
 }
 
 let wait = async function(ms) {
