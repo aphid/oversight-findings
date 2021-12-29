@@ -294,7 +294,7 @@ async function checkForCompletePDF(inData, meta) {
         doc.image(page, 0, 0, {
             fit: [doc.page.width, doc.page.height]
         });
-        let imgmeta = await exif.read(p);
+        let imgmeta = await exif.read(page);
         console.log(imgmeta);
         if (imgmeta.DerivedFrom.RenditionClass) {
             reduced.push.apply(reduced, JSON.parse(imgmeta.DerivedFrom.RenditionClass));
