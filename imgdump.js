@@ -301,9 +301,15 @@ async function checkForCompletePDF(inData, meta) {
 
     }
     meta.DerivedFromRenditionClass = JSON.stringify(reduced);
-    for (let m in meta) {
-        meta[m] = meta[m].replace("exif:", "");
-    }
+    meta.GPSLatitude = meta["exif:GPSLatitude"];
+    delete meta["exif:GPSLatitude"];
+    meta.GPSAltitudeRef = meta["exif:GPSLatitudeRef"];
+    delete meta["exif:GPSLatitudeRef"];
+    meta.GPSLongitude = meta["exif:GPSLongitude"];
+    delete meta["exif:GPSLongitude"];
+    meta.GPSLongitudeRef = meta["exif:GPSLongitudeRef"];
+    delete meta["exif:GPSLongitudeRef"];
+
     doc.end();
     console.log(meta);
     let ex = await exif.write(pdfout, meta, ['-overwrite_original', '-n']);
