@@ -315,7 +315,7 @@ async function checkForCompletePDF(inData, meta) {
     wait(5000);
     console.log(meta);
     try {
-        let ex = await exif.write(pdfout, meta, ['-overwrite_original', '-n']);
+        let ex = await exif.write(pdfout, meta, [ /*'-overwrite_original',*/ '-n']);
         console.log(ex);
     } catch (e) {
         console.log(e);
