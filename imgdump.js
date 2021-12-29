@@ -312,8 +312,13 @@ async function checkForCompletePDF(inData, meta) {
 
     doc.end();
     console.log(meta);
-    let ex = await exif.write(pdfout, meta, ['-overwrite_original', '-n']);
-    console.log(ex);
+    try {
+        let ex = await exif.write(pdfout, meta, ['-overwrite_original', '-n']);
+        console.log(ex);
+    } catch (e) {
+        console.log(e);
+        throw (e);
+    }
     //if we got this far, make a PDF;
 }
 
