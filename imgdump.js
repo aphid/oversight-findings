@@ -316,7 +316,7 @@ async function pdfFromID(title) {
     }
     console.log("ok");
     console.log(data.data);
-
+    return Promise.resolve(data.data);
     console.log("no data", url);
 }
 
@@ -378,4 +378,4 @@ port = 3000;
 server.listen(port);
 console.log('Listening at http://' + ':' + port);
 
-console.log(pdfFromID("180307_0930_os-bfarrell-030718"));
+//console.log(pdfFromID("180307_0930_os-bfarrell-030718"));
