@@ -258,6 +258,7 @@ function reduceWords(input) {
 
 async function checkForCompletePDF(inData) {
     let pdf = await pdfFromID(inData.title);
+    console.log(pdf);
     let pageCount = pdf.pdfinfo.pages;
     let pages = [];
     for (let i = 0; i < pageCount; i++) {
