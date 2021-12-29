@@ -172,7 +172,7 @@ async function processOCR(inData) {
 
     if (inData.pageImg) {
         console.log("IMAGE");
-        var out = outDir + "ocr/" + san(inData.title + "_" + inData.page + "_" + inData.mode + ".png");
+        var out = outDir + "ocr/" + san(inData.title + "_" + (inData.page + "").padStart(3, "0") + "_" + inData.mode + ".png");
         console.log(out);
         if (!fs.existsSync(out) || 1 == 1) {
             var img = inData.pageImg.replace(/^data:image\/png;base64,/, "");
