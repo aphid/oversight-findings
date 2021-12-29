@@ -305,6 +305,9 @@ async function checkForCompletePDF(inData, meta) {
     }
     console.log("metaaaa");
     pmeta = {};
+    pmeta.author = meta.author;
+    pmeta.owner = meta.owner;
+    pmeta.timestamp = meta.timestamp;
     pmeta.DerivedFromRenditionClass = JSON.stringify(reduced);
     pmeta.GPSLatitude = meta["exif:GPSLatitude"];
     pmeta.GPSLatitudeRef = meta["exif:GPSLatitudeRef"];
