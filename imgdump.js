@@ -175,6 +175,9 @@ async function processOCR(inData) {
         console.log("IMAGE");
         var out = outDir + "ocr/" + san(inData.title + "_" + (inData.page + "").padStart(3, "0") + "_" + inData.mode + ".png");
         console.log(out);
+        meta.author = inData.author;
+        meta.timestamp = inData.timestamp;
+        meta.ownerName = `${witness.title || ""} ${witness.firstName} ${witness.lastName}, ${witness.org || ""}`;
         if (!fs.existsSync(out)) {
             var img = inData.pageImg.replace(/^data:image\/png;base64,/, "");
             fs.writeFileSync(out, img, 'base64');
@@ -182,10 +185,9 @@ async function processOCR(inData) {
             reduced = reduceWords(inData.words);
             console.log("reduced: ", reduced);
             console.log(inData.timestamp);
-            meta.author = inData.author;
-            meta.timestamp = inData.timestamp;
+
             meta.DerivedFromRenditionClass = JSON.stringify(reduced);
-            meta.ownerName = `${witness.title || ""} ${witness.firstName} ${witness.lastName}, ${witness.org || ""}`;
+
         }
         if (location) {
             meta["exif:GPSLatitude"] = location[0];
