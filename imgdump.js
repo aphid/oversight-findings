@@ -291,8 +291,9 @@ async function checkForCompletePDF(inData) {
 }
 
 async function pdfFromID(title) {
-    let hearing = await hearingFromID(title).hearing;
-    console.log(hearing);
+    let hearing = await hearingFromID(title);
+    hearing = hearing.hearing;
+    //console.log(hearing);
     let found = false;
     for (let w of hearing.witnesses) {
         for (let p of w.pdfs) {
@@ -313,7 +314,7 @@ async function pdfFromID(title) {
         throw (e);
     }
     console.log("ok");
-    return data.data;
+    console.log(data.data);
 
     console.log("no data", url);
 }
@@ -333,10 +334,10 @@ async function hearingFromID(title) {
                 if (w.pdfs) {
                     for (let p of w.pdfs) {
                         if (p.shortName === title) {
-                            return {
+                            return Promise.resolve({
                                 hearing: h,
                                 witness: w
-                            };
+                            });
                         }
                     }
 
@@ -375,3 +376,5 @@ function processSpu(data) {
 port = 3000;
 server.listen(port);
 console.log('Listening at http://' + ':' + port);
+
+console.log(pdfFromID("180307_0930_os-bfarrell-030718"));
