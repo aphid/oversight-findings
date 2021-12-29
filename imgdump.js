@@ -312,6 +312,7 @@ async function checkForCompletePDF(inData, meta) {
     delete meta["exif:GPSLongitudeRef"];
 
     doc.end();
+    wait(5000);
     console.log(meta);
     try {
         let ex = await exif.write(pdfout, meta, ['-overwrite_original', '-n']);
@@ -322,6 +323,15 @@ async function checkForCompletePDF(inData, meta) {
     }
     //if we got this far, make a PDF;
 }
+
+let wait = async function(ms) {
+    return new Promise(resolve => {
+        setTimeout(() => {
+            resolve();
+        }, (ms));
+    });
+};
+
 
 async function pdfFromID(title) {
     let hearing = await hearingFromID(title);
