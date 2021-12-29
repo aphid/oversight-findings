@@ -293,7 +293,18 @@ async function checkForCompletePDF(inData) {
 async function pdfFromID(title) {
     let hearing = await hearingFromID(title).hearing;
     console.log(hearing);
-    let url = "https://oversightmachin.es/oversee/media/text/" + hearing.localName + ".json";
+    let found = false;
+    for (let w of hearing.witnesses) {
+        for (let p of w.pdfs) {
+            if (p.shortName === title) {
+                found = p;
+            }
+        }
+    }
+    if (!p) {
+        return false;
+    }
+    let url = "https://oversightmachin.es/oversee/media/text/" + found.localName + ".json";
     console.log("fetching", url);
     let data;
     try {
