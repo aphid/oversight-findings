@@ -176,8 +176,12 @@ async function processOCR(inData) {
         var out = outDir + "ocr/" + san(inData.title + "_" + (inData.page + "").padStart(3, "0") + "_" + inData.mode + ".png");
         console.log(out);
         meta.author = inData.author;
-        meta.timestamp = inData.timestamp;
-        meta.ownerName = `${witness.title || ""} ${witness.firstName} ${witness.lastName}, ${witness.org || ""}`;
+        //meta.timestamp = inData.timestamp;
+        meta.ownerName = `${witness.title || ""} ${witness.firstName} ${witness.lastName}`;
+        if (witness.org) {
+            meta.ownerName += ", " + witness.org;
+        }
+
         if (!fs.existsSync(out)) {
             var img = inData.pageImg.replace(/^data:image\/png;base64,/, "");
             fs.writeFileSync(out, img, 'base64');
