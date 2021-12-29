@@ -303,7 +303,7 @@ async function checkForCompletePDF(inData, meta) {
     meta.DerivedFromRenditionClass = JSON.stringify(reduced);
     meta.GPSLatitude = meta["exif:GPSLatitude"];
     delete meta["exif:GPSLatitude"];
-    meta.GPSAltitudeRef = meta["exif:GPSLatitudeRef"];
+    meta.GPSLatitudeRef = meta["exif:GPSLatitudeRef"];
     delete meta["exif:GPSLatitudeRef"];
     meta.GPSLongitude = meta["exif:GPSLongitude"];
     delete meta["exif:GPSLongitude"];
