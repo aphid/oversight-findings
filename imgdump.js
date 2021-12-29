@@ -311,7 +311,7 @@ async function checkForCompletePDF(inData, meta) {
     //pdfout = pdfout.replace(".pdf", "_m.pdf");
     doc.end();
     console.log(pmeta);
-    writeStream.on('finish', function() {
+    writeStream.on('finish', async function() {
         try {
             let ex = await exif.write(pdfout, pmeta, ['-overwrite_original', '-n']);
             console.log(ex);
