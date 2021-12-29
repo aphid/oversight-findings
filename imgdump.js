@@ -301,7 +301,9 @@ async function checkForCompletePDF(inData, meta) {
 
     }
     meta.DerivedFromRenditionClass = JSON.stringify(reduced);
-
+    for (let m in meta) {
+        meta[m] = meta[m].replace("exif:", "");
+    }
     doc.end();
     console.log(meta);
     let ex = await exif.write(pdfout, meta, ['-overwrite_original', '-n']);
