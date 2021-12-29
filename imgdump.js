@@ -202,7 +202,7 @@ async function processOCR(inData) {
     }
     if (inData.words) {
         console.log("WORDS");
-        var out = outDir + "ocr/" + san(inData.title + "_" + inData.page + "_" + inData.mode + ".json");
+        var out = outDir + "ocr/" + san(inData.title + "_" + (inData.page + "").padStart(3, "0") + "_" + inData.mode + ".json");
         if (!fs.existsSync(out)) {
 
             fs.writeFileSync(out, JSON.stringify({
@@ -261,7 +261,7 @@ async function checkForCompletePDF(inData) {
     let pageCount = pdf.pdfinfo.pages;
     let pages = [];
     for (let i = 0; i < pageCount; i++) {
-        var out = outDir + "ocr/" + san(inData.title + "_" + i + "_" + inData.mode + ".png");
+        var out = outDir + "ocr/" + san(inData.title + "_" + (i + "").padStart(3, "0") + "_" + inData.mode + ".png");
         pages.push(out);
         console.log("testing", out);
         if (!fs.existsSync(out)) {
