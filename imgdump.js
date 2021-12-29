@@ -294,12 +294,13 @@ async function checkForCompletePDF(inData, meta) {
             fit: [doc.page.width, doc.page.height]
         });
         let imgmeta = await exif.read(page);
-        console.log(imgmeta);
+        //console.log(imgmeta);
         if (imgmeta.DerivedFrom.RenditionClass) {
             reduced.push.apply(reduced, JSON.parse(imgmeta.DerivedFrom.RenditionClass));
         }
 
     }
+    console.log("metaaaa");
     //meta.DerivedFromRenditionClass = JSON.stringify(reduced);
     meta.GPSLatitude = meta["exif:GPSLatitude"];
     delete meta["exif:GPSLatitude"];
