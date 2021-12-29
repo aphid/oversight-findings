@@ -310,12 +310,12 @@ async function checkForCompletePDF(inData, meta) {
     delete meta["exif:GPSLongitude"];
     meta.GPSLongitudeRef = meta["exif:GPSLongitudeRef"];
     delete meta["exif:GPSLongitudeRef"];
-    pdfout = pdfout.replace(".pdf", "_m.pdf");
+    //pdfout = pdfout.replace(".pdf", "_m.pdf");
     doc.end();
     wait(5000);
     console.log(meta);
     try {
-        let ex = await exif.write(pdfout, meta, [ /*'-overwrite_original',*/ '-n']);
+        let ex = await exif.write(pdfout, meta, ['-overwrite_original', '-n']);
         console.log(ex);
     } catch (e) {
         console.log(e);
