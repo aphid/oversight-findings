@@ -155,6 +155,7 @@ async function processOCR(inData) {
     //var hash = crypto.createHash('md5').update(ip + new Date().toTimeString()).digest('hex');
     //DO IMAGE
     let reduced = [];
+    let meta = {};
     let hearing = await hearingFromID(inData.title);
     console.log(hearing);
     let witness = hearing.witness;
@@ -174,14 +175,14 @@ async function processOCR(inData) {
         console.log("IMAGE");
         var out = outDir + "ocr/" + san(inData.title + "_" + (inData.page + "").padStart(3, "0") + "_" + inData.mode + ".png");
         console.log(out);
-        if (!fs.existsSync(out) || 1 == 1) {
+        if (!fs.existsSync(out)) {
             var img = inData.pageImg.replace(/^data:image\/png;base64,/, "");
             fs.writeFileSync(out, img, 'base64');
             console.log("writing ", out);
             reduced = reduceWords(inData.words);
             console.log("reduced: ", reduced);
             console.log(inData.timestamp);
-            let meta = {
+            meta = {
                 "author": inData.author,
                 "timestamp": inData.timestamp,
                 "DerivedFromRenditionClass": JSON.stringify(reduced),
@@ -224,7 +225,7 @@ async function processOCR(inData) {
         console.log("no words");
     }
     console.log("checking for full pdf");
-    let docComplete = await checkForCompletePDF(inData);
+    let docComplete = await checkForCompletePDF(inData, meta);
     if (docComplete) {
         console.log("doc is complete");
     } else {
@@ -256,11 +257,12 @@ function reduceWords(input) {
     return reduced;
 }
 
-async function checkForCompletePDF(inData) {
+async function checkForCompletePDF(inData, meta) {
     let pdf = await pdfFromID(inData.title);
     console.log(pdf);
     let pageCount = pdf.pdfinfo.pages;
     let pages = [];
+    let reduced = [];
     for (let i = 0; i < pageCount; i++) {
         var out = outDir + "ocr/" + san(inData.title + "_" + (i + "").padStart(3, "0") + "_" + inData.mode + ".png");
         pages.push(out);
@@ -270,13 +272,19 @@ async function checkForCompletePDF(inData) {
             return false;
         } else {
             console.log("so far so good", out);
+            let read = fs.readFileSync(out.replace("png", "json"));
+            if (read) {
+                read = JSON.parse(read);
+                reduced.push.apply(reduced, read.reduced);
+            }
         }
     }
     console.log("time to make a PDF");
     let doc = new pdfkit({
         autoFirstPage: false
     });
-    doc.pipe(fs.createWriteStream(outDir + "ocr/" + san(inData.title + "_" + inData.mode + ".pdf")));
+    let pdfout = outDir + "ocr/" + san(inData.title + "_" + inData.mode + ".pdf");
+    doc.pipe(fs.createWriteStream(pdfout));
 
     for (let page of pages) {
         doc.addPage({
@@ -285,9 +293,19 @@ async function checkForCompletePDF(inData) {
         doc.rect(0, 0, doc.page.width, doc.page.height).fill('#16161d'); //eigengrau background
         doc.image(page, 0, 0, {
             fit: [doc.page.width, doc.page.height]
-        })
+        });
+        let imgmeta = await exif.read(p);
+        console.log(imgmeta);
+        if (imgmeta.DerivedFrom.RenditionClass) {
+            reduced.push.apply(reduced, JSON.parse(imgmeta.DerivedFrom.RenditionClass));
+        }
+
     }
+    meta.DerivedFromRenditionClass = JSON.stringify(reduced);
+
     doc.end();
+    let ex = await exif.write(pdfout, meta, ['-overwrite_original', '-n']);
+    console.log(ex);
     //if we got this far, make a PDF;
 }
 
