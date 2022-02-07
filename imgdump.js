@@ -92,7 +92,7 @@ var server = method.createServer(serverOpts, function(req, res) {
             res.writeHead(200, {
                 'Content-Type': 'text/html'
             });
-            res.end('{status: "success"}');
+            res.end('{"status": "success"}');
         });
 
     } else {
