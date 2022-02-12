@@ -107,7 +107,10 @@ var server = method.createServer(serverOpts, function(req, res) {
 async function processUnburn(data) {
     //"machine":"unburn","mode":"d","time":32.64,"data":{"interval":102,"low":53,"high":151},"image":"
     let id = `${data.unburnCode}_${data.mode}_${data.data.interval}_${data.data.low}_${data.data.high}_${data.time}`;
-    var out = `${outDir}unburn/${id}.png`;
+    if (!fs.existsSync(`${outDir}/unburn/${data.unburnCode}`)) {
+        fs.mkdirSync(`${outDir}/unburn/${data.unburnCode}`);
+    }
+    var out = `${outDir}unburn/${data.unburnCode}/${id}.png`;
     console.log(id);
     console.log(out);
     let md;
@@ -311,7 +314,7 @@ async function checkForCompletePDF(inData, meta) {
     pmeta = {};
     pmeta.author = meta.author;
     pmeta.owner = meta.owner;
-    pmeta.timestamp = meta.timestamp;
+    //pmeta.timestamp = meta.timestamp;
     pmeta.DerivedFromRenditionClass = JSON.stringify(reduced);
     pmeta.GPSLatitude = meta["exif:GPSLatitude"];
     pmeta.GPSLatitudeRef = meta["exif:GPSLatitudeRef"];
