@@ -18,7 +18,7 @@ var serverOpts = {};
 console.log(hearingsFile)
 var hearings = JSON.parse(fs.readFileSync(hearingsFile));
 
-var dirs = ["ocr", "spu", "unburn"];
+var dirs = ["ocr", "spu", "unburn", "slash"];
 for (let d of dirs) {
     let target = outDir + "/" + d;
     if (!fs.existsSync(target)) {
@@ -72,17 +72,25 @@ var server = method.createServer(serverOpts, function(req, res) {
         req.on('end', function() {
             console.log(req.headers.referer);
             if (req.headers.referer) {
-
+		console.log("referer", req.headers.referer);
             }
             //need to determine which machine it is and pass it off to a handler
 
-            var inData = JSON.parse(body);
+            var inData;
+	    try { inData = JSON.parse(body); }
+	    catch(e) {
+  		console.log(body);
+		throw(e);
+	    }
+
             if (inData.machine === "spu") {
                 processSpu(inData);
             } else if (inData.machine === "unburn") {
                 //"machine":"unburn","mode":"d","time":32.64,"data":{"interval":102,"low":53,"high":151},"image":"
                 processUnburn(inData);
             } else {
+		//it's ocr
+		console.log("OCR");
                 let ip = req.socket.remoteAddress;
                 let timestamp = moment().format("YYYY:MM:DD HH:mm:s.SSZ");
                 inData.author = ip;
@@ -163,7 +171,12 @@ async function processOCR(inData) {
     console.log(hearing);
     let witness = hearing.witness;
     hearing = hearing.hearing;
-
+    let subpath = "ocr/";
+    if (inData.exh === "slash"){
+	subpath = "slash/";
+    }
+    let outpattern = outDir + `${subpath}${san(inData.title)}_${(inData.page + "").padStart(3,"0")}_${inData.mode}`;
+    console.log(subpath);
     let location;
     if (hearing.location.includes("Hart")) {
         location = [38.893056, -77.004167];
@@ -173,11 +186,10 @@ async function processOCR(inData) {
         location = [38.893056, -77.005278];
     }
 
-
     if (inData.pageImg) {
         console.log("IMAGE");
-        var out = outDir + "ocr/" + san(inData.title + "_" + (inData.page + "").padStart(3, "0") + "_" + inData.mode + ".png");
-        console.log(out);
+	let out = outpattern + ".png";
+	console.log(out);
         meta.author = inData.author;
         //meta.timestamp = inData.timestamp;
         meta.ownerName = `${witness.title || ""} ${witness.firstName} ${witness.lastName}`;
@@ -211,7 +223,7 @@ async function processOCR(inData) {
 
     if (inData.words) {
         console.log("WORDS");
-        var out = outDir + "ocr/" + san(inData.title + "_" + (inData.page + "").padStart(3, "0") + "_" + inData.mode + ".json");
+	let out = outpattern + ".json";
         if (!fs.existsSync(out)) {
 
             fs.writeFileSync(out, JSON.stringify({
@@ -233,7 +245,7 @@ async function processOCR(inData) {
         console.log("no words");
     }
     console.log("checking for full pdf");
-    let docComplete = await checkForCompletePDF(inData, meta);
+    let docComplete = await checkForCompletePDF(inData, meta, subpath);
     if (docComplete) {
         console.log("doc is complete");
     } else {
@@ -265,14 +277,14 @@ function reduceWords(input) {
     return reduced;
 }
 
-async function checkForCompletePDF(inData, meta) {
+async function checkForCompletePDF(inData, meta, subpath) {
     let pdf = await pdfFromID(inData.title);
     console.log(pdf);
     let pageCount = pdf.pdfinfo.pages;
     let pages = [];
     let reduced = [];
     for (let i = 0; i < pageCount; i++) {
-        var out = outDir + "ocr/" + san(inData.title + "_" + (i + "").padStart(3, "0") + "_" + inData.mode + ".png");
+        let out = outDir + subpath + san(inData.title + "_" + (i + "").padStart(3, "0") + "_" + inData.mode + ".png");
         pages.push(out);
         console.log("testing", out);
         if (!fs.existsSync(out)) {
@@ -291,7 +303,7 @@ async function checkForCompletePDF(inData, meta) {
     let doc = new pdfkit({
         autoFirstPage: false
     });
-    let pdfout = outDir + "ocr/" + san(inData.title + "_" + inData.mode + ".pdf");
+    let pdfout = outDir + subpath + san(inData.title + "_" + inData.mode + ".pdf");
     let stream = fs.createWriteStream(pdfout);
     doc.pipe(stream);
 
@@ -347,7 +359,6 @@ let wait = async function(ms) {
 async function pdfFromID(title) {
     let hearing = await hearingFromID(title);
     hearing = hearing.hearing;
-    //console.log(hearing);
     let found = false;
     for (let w of hearing.witnesses) {
         for (let p of w.pdfs) {
@@ -359,7 +370,7 @@ async function pdfFromID(title) {
     if (!found) {
         return false;
     }
-    let url = "https://oversightmachin.es/oversee/media/text/" + found.localName + ".json";
+    let url = "https://oversightmachin.es/overSSCIght/media/text/" + found.localName + ".json";
     console.log("fetching", url);
     let data;
     try {
@@ -374,7 +385,7 @@ async function pdfFromID(title) {
 }
 
 async function hearingFromID(title) {
-    let url = "https://oversightmachin.es/oversee/data/211201_07.json";
+    let url = "https://oversightmachin.es/overSSCIght/data/211201_07.json";
     let data;
     try {
         data = await axios.get(url);
