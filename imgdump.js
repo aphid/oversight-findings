@@ -143,9 +143,9 @@ async function processUnburn(data) {
         "XMP-crd:WhiteBalance": "b7e",
         "GPSAltitude": 1312,
         "GPSAltitudeRef": 0,
-        "GPSAreaInformation": "Baltimore, MD",
-        "GPSLatitude": "39.2904",
-        "GPSLongitude": "-76.6122"
+        "GPSAreaInformation": "Winchester, VA",
+        "GPSLatitude": "39.141014",
+        "GPSLongitude": "-78.1197433"
     };
 
     if (data.data.metadata) {
