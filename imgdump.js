@@ -168,11 +168,12 @@ async function processOCR(inData) {
     let reduced = [];
     let meta = {};
     let hearing = await hearingFromID(inData.title);
+    //console.log(inData);
     console.log(hearing);
     let witness = hearing.witness;
     hearing = hearing.hearing;
     let subpath = "ocr/";
-    if (inData.exh === "slash"){
+    if (inData.exh === "slash" || inData.exhibition === "slash"){
 	subpath = "slash/";
     }
     let outpattern = outDir + `${subpath}${san(inData.title)}_${(inData.page + "").padStart(3,"0")}_${inData.mode}`;
@@ -217,7 +218,7 @@ async function processOCR(inData) {
             //meta["GPSPosition"] = `${location[0]} ${location[1]}`;
         }
         let ex = await exif.write(out, meta, ['-overwrite_original', '-n']);
-        console.log(ex);
+        //console.log(ex);
         addPage(inData.title, inData.page);
     }
 
@@ -248,11 +249,29 @@ async function processOCR(inData) {
     let docComplete = await checkForCompletePDF(inData, meta, subpath);
     if (docComplete) {
         console.log("doc is complete");
+	await updatehDocs(inData);
     } else {
         console.log("doc not complete");
     }
     console.log("finished");
 }
+
+let updatehDocs = async function(indata){
+    console.log("updating hdocs");
+    let fn = "/var/www/oversightmachin.es/html/ocr/hdocs.json";
+    let data = fs.readFileSync(fn);
+    data = JSON.parse(data);
+    for (let d of data){
+        if (indata.title === d.shortName && !d.completedModes.includes(indata.mode)){
+	    d.completedModes.push(indata.mode);
+	    console.log(d);
+	}
+    }
+    console.log("rewriting file");
+    fs.writeFileSync(fn, JSON.stringify(data, undefined, 2));
+}
+
+
 
 function reduceWords(input) {
     let reduced = [];
@@ -265,12 +284,12 @@ function reduceWords(input) {
             }
         } else if (p.length > 1) {
             let arr = [];
-            console.log(p);
+            //console.log(p);
             for (let pot of p) {
-                console.log(pot.word);
+                //console.log(pot.word);
                 arr.push(pot.word)
             }
-            console.log(arr);
+            //console.log(arr);
             reduced.push(arr);
         }
     }
@@ -279,7 +298,7 @@ function reduceWords(input) {
 
 async function checkForCompletePDF(inData, meta, subpath) {
     let pdf = await pdfFromID(inData.title);
-    console.log(pdf);
+    //console.log(pdf);
     let pageCount = pdf.pdfinfo.pages;
     let pages = [];
     let reduced = [];
@@ -299,11 +318,15 @@ async function checkForCompletePDF(inData, meta, subpath) {
             }
         }
     }
+    let pdfout = outDir + subpath + san(inData.title + "_" + inData.mode + ".pdf");
+    if (fs.existsSync(pdfout)){
+       console.log("PDF exists");
+       return true;
+    }
     console.log("time to make a PDF");
     let doc = new pdfkit({
         autoFirstPage: false
     });
-    let pdfout = outDir + subpath + san(inData.title + "_" + inData.mode + ".pdf");
     let stream = fs.createWriteStream(pdfout);
     doc.pipe(stream);
 
@@ -334,13 +357,13 @@ async function checkForCompletePDF(inData, meta, subpath) {
     pmeta.GPSLongitudeRef = meta["exif:GPSLongitudeRef"];
     //pdfout = pdfout.replace(".pdf", "_m.pdf");
     doc.end();
-    console.log(pmeta);
+    //console.log(pmeta);
     stream.on('finish', async function() {
         try {
             let ex = await exif.write(pdfout, pmeta, ['-overwrite_original', '-n']);
-            console.log(ex);
+            //console.log(ex);
         } catch (e) {
-            console.log(e);
+            //console.log(e);
             throw (e);
         }
         //if we got this far, make a PDF;
@@ -370,6 +393,7 @@ async function pdfFromID(title) {
     if (!found) {
         return false;
     }
+    console.log("found ", found);
     let url = "https://oversightmachin.es/overSSCIght/media/text/" + found.localName + ".json";
     console.log("fetching", url);
     let data;
@@ -379,26 +403,32 @@ async function pdfFromID(title) {
         throw (e);
     }
     console.log("ok");
-    console.log(data.data);
+    //console.log(data.data);
     return Promise.resolve(data.data);
     console.log("no data", url);
 }
 
 async function hearingFromID(title) {
-    let url = "https://oversightmachin.es/overSSCIght/data/211201_07.json";
+    /* let url = "https://oversightmachin.es/overSSCIght/data/240903_11.json";
     let data;
     try {
         data = await axios.get(url);
     } catch (e) {
         throw (e.response);
     }
+    //console.log(data.data);
+    console.log("hfi", title);
     console.log(data.data);
-    for (let h of data.data.hearings) {
+    */
+    let data = JSON.parse(fs.readFileSync("data.json"));
+    for (let h of data.hearings) {
         if (h.witnesses) {
             for (let w of h.witnesses) {
                 if (w.pdfs) {
                     for (let p of w.pdfs) {
+			console.log(p.shortName);
                         if (p.shortName === title) {
+			    console.log("found title");
                             return Promise.resolve({
                                 hearing: h,
                                 witness: w
