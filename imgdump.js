@@ -20,11 +20,12 @@ var hearings = JSON.parse(fs.readFileSync(hearingsFile));
 
 var dirs = ["ocr", "spu", "unburn", "slash"];
 for (let d of dirs) {
-    let target = outDir + "/" + d;
+    let target = outDir + "/" + d + "/";
     if (!fs.existsSync(target)) {
         fs.mkdirSync(target);
     }
 }
+
 
 
 if (settings.privKey && settings.cert) {
