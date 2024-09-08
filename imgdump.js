@@ -247,12 +247,16 @@ async function processOCR(inData) {
         console.log("no words");
     }
     console.log("checking for full pdf");
-    let docComplete = await checkForCompletePDF(inData, meta, subpath);
-    if (docComplete) {
+    let pdfprogress = await checkForCompletePDF(inData, meta, subpath);
+    if (pdfprogress.sofar == "complete") {
         console.log("doc is complete");
         await updatehDocs(inData);
-    } else {
-        console.log("doc not complete");
+    } else if (pdfprogress.sofar == "partial"){
+        console.log("doc incomplete");
+        inData.lastPage = pdfprogress.lastPage;
+        await updatehDocs(inData);
+    } else if (pdf.progress.sofar == "none"){
+        console.log("doc hasn't been started");
     }
     console.log("finished");
 }
@@ -303,13 +307,19 @@ async function checkForCompletePDF(inData, meta, subpath) {
     let pageCount = pdf.pdfinfo.pages;
     let pages = [];
     let reduced = [];
+    let sofar = "none";
     for (let i = 0; i < pageCount; i++) {
         let out = outDir + subpath + san(inData.title + "_" + (i + "").padStart(3, "0") + "_" + inData.mode + ".png");
         pages.push(out);
         console.log("testing", out);
         if (!fs.existsSync(out)) {
-            console.log("missing", out);
-            return false;
+            let theobj = {sofar: sofar}
+            if (i > 0) {
+                theobj.sofar = "incomplete";
+                theobj.lastPage = i - 1;
+            }
+
+            return Promise.resolve(theobj);
         } else {
             console.log("so far so good", out);
             let read = fs.readFileSync(out.replace("png", "json"));
@@ -319,11 +329,13 @@ async function checkForCompletePDF(inData, meta, subpath) {
             }
         }
     }
+    sofar = "full";
     let pdfout = outDir + subpath + san(inData.title + "_" + inData.mode + ".pdf");
     if (fs.existsSync(pdfout)) {
         console.log("PDF exists");
-        return true;
+        return Promise.resolve({sofar: sofar});
     }
+    //make this a different function tho.
     console.log("time to make a PDF");
     let doc = new pdfkit({
         autoFirstPage: false
@@ -362,6 +374,8 @@ async function checkForCompletePDF(inData, meta, subpath) {
     stream.on('finish', async function () {
         try {
             let ex = await exif.write(pdfout, pmeta, ['-overwrite_original', '-n']);
+            return Promise.resolve({sofar: sofar});
+
             //console.log(ex);
         } catch (e) {
             //console.log(e);
