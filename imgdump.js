@@ -38,7 +38,7 @@ if (settings.privKey && settings.cert) {
 
 
 
-var addPage = function(title, page) {
+var addPage = function (title, page) {
     for (let h of hearings.hearings) {
         for (let w of h.witnesses) {
             for (let p of w.pdfs) {
@@ -55,7 +55,7 @@ var addPage = function(title, page) {
 };
 
 
-var server = method.createServer(serverOpts, function(req, res) {
+var server = method.createServer(serverOpts, function (req, res) {
     console.log(moment().format());
     console.dir(req.param);
 
@@ -67,22 +67,22 @@ var server = method.createServer(serverOpts, function(req, res) {
     if (req.method == 'POST') {
         console.log("POST");
         var body = '';
-        req.on('data', function(data) {
+        req.on('data', function (data) {
             body += data.toString();
         });
-        req.on('end', function() {
+        req.on('end', function () {
             console.log(req.headers.referer);
             if (req.headers.referer) {
-		console.log("referer", req.headers.referer);
+                console.log("referer", req.headers.referer);
             }
             //need to determine which machine it is and pass it off to a handler
 
             var inData;
-	    try { inData = JSON.parse(body); }
-	    catch(e) {
-  		console.log(body);
-		throw(e);
-	    }
+            try { inData = JSON.parse(body); }
+            catch (e) {
+                console.log(body);
+                throw (e);
+            }
 
             if (inData.machine === "spu") {
                 processSpu(inData);
@@ -90,8 +90,8 @@ var server = method.createServer(serverOpts, function(req, res) {
                 //"machine":"unburn","mode":"d","time":32.64,"data":{"interval":102,"low":53,"high":151},"image":"
                 processUnburn(inData);
             } else {
-		//it's ocr
-		console.log("OCR");
+                //it's ocr
+                console.log("OCR");
                 let ip = req.socket.remoteAddress;
                 let timestamp = moment().format("YYYY:MM:DD HH:mm:s.SSZ");
                 inData.author = ip;
@@ -174,10 +174,10 @@ async function processOCR(inData) {
     let witness = hearing.witness;
     hearing = hearing.hearing;
     let subpath = "ocr/";
-    if (inData.exh === "slash" || inData.exhibition === "slash"){
-	subpath = "slash/";
+    if (inData.exh === "slash" || inData.exhibition === "slash") {
+        subpath = "slash/";
     }
-    let outpattern = outDir + `${subpath}${san(inData.title)}_${(inData.page + "").padStart(3,"0")}_${inData.mode}`;
+    let outpattern = outDir + `${subpath}${san(inData.title)}_${(inData.page + "").padStart(3, "0")}_${inData.mode}`;
     console.log(subpath);
     let location;
     if (hearing.location.includes("Hart")) {
@@ -190,8 +190,8 @@ async function processOCR(inData) {
 
     if (inData.pageImg) {
         console.log("IMAGE");
-	let out = outpattern + ".png";
-	console.log(out);
+        let out = outpattern + ".png";
+        console.log(out);
         meta.author = inData.author;
         //meta.timestamp = inData.timestamp;
         meta.ownerName = `${witness.title || ""} ${witness.firstName} ${witness.lastName}`;
@@ -225,7 +225,7 @@ async function processOCR(inData) {
 
     if (inData.words) {
         console.log("WORDS");
-	let out = outpattern + ".json";
+        let out = outpattern + ".json";
         if (!fs.existsSync(out)) {
 
             fs.writeFileSync(out, JSON.stringify({
@@ -250,23 +250,23 @@ async function processOCR(inData) {
     let docComplete = await checkForCompletePDF(inData, meta, subpath);
     if (docComplete) {
         console.log("doc is complete");
-	await updatehDocs(inData);
+        await updatehDocs(inData);
     } else {
         console.log("doc not complete");
     }
     console.log("finished");
 }
 
-let updatehDocs = async function(indata){
+let updatehDocs = async function (indata) {
     console.log("updating hdocs");
     let fn = "/var/www/oversightmachin.es/html/ocr/hdocs.json";
     let data = fs.readFileSync(fn);
     data = JSON.parse(data);
-    for (let d of data){
-        if (indata.title === d.shortName && !d.completedModes.includes(indata.mode)){
-	    d.completedModes.push(indata.mode);
-	    console.log(d);
-	}
+    for (let d of data) {
+        if (indata.title === d.shortName && !d.completedModes.includes(indata.mode)) {
+            d.completedModes.push(indata.mode);
+            console.log(d);
+        }
     }
     console.log("rewriting file");
     fs.writeFileSync(fn, JSON.stringify(data, undefined, 2));
@@ -320,9 +320,9 @@ async function checkForCompletePDF(inData, meta, subpath) {
         }
     }
     let pdfout = outDir + subpath + san(inData.title + "_" + inData.mode + ".pdf");
-    if (fs.existsSync(pdfout)){
-       console.log("PDF exists");
-       return true;
+    if (fs.existsSync(pdfout)) {
+        console.log("PDF exists");
+        return true;
     }
     console.log("time to make a PDF");
     let doc = new pdfkit({
@@ -359,7 +359,7 @@ async function checkForCompletePDF(inData, meta, subpath) {
     //pdfout = pdfout.replace(".pdf", "_m.pdf");
     doc.end();
     //console.log(pmeta);
-    stream.on('finish', async function() {
+    stream.on('finish', async function () {
         try {
             let ex = await exif.write(pdfout, pmeta, ['-overwrite_original', '-n']);
             //console.log(ex);
@@ -371,7 +371,7 @@ async function checkForCompletePDF(inData, meta, subpath) {
     });
 }
 
-let wait = async function(ms) {
+let wait = async function (ms) {
     return new Promise(resolve => {
         setTimeout(() => {
             resolve();
@@ -427,9 +427,9 @@ async function hearingFromID(title) {
             for (let w of h.witnesses) {
                 if (w.pdfs) {
                     for (let p of w.pdfs) {
-			console.log(p.shortName);
+                        console.log(p.shortName);
                         if (p.shortName === title) {
-			    console.log("found title");
+                            console.log("found title");
                             return Promise.resolve({
                                 hearing: h,
                                 witness: w
