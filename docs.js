@@ -1,12 +1,13 @@
 let full, docs, hDocs;
 let fs = require("fs");
 let docspath = "/var/www/oversightmachin.es/html/ocr/";
+let slashPath = "/mnt/oversee/findings/slash/";
+let ocrPath = "/mnt/oversee/findings/ocr/"
+
 hDocs = [];
 let getData = async function () {
    let f = fs.readFileSync("data.json");
    full = JSON.parse(f);
-   let d = fs.readFileSync("docs.json");
-   docs = JSON.parse(d)
 }
 
 let Doc = function (o, w, h) {
@@ -31,6 +32,7 @@ let Doc = function (o, w, h) {
 
 let makeHearDocs = async function () {
    for (let hearing of full.hearings) {
+      console.log(hearing.shortName);
       for (let witness of hearing.witnesses) {
          for (let pdf of witness.pdfs) {
             if (pdf.needsScan) {
@@ -42,14 +44,19 @@ let makeHearDocs = async function () {
          }
       }
    }
+   console.log("done");
    return Promise.resolve();
 }
 
 let checkHearDocs = async function () {
    for (let h of hDocs) {
+      console.log("checking pdf");
       let cp = await h.checkPDF();
+      console.log("checking images");
       let ci = await h.checkImages();
-      let co = await h.checkOCR();
+      console.log("checking ocr");
+      let co = await h.checkOCR(slashPath, "hdocs.json");
+      co = await h.checkOCR(ocrPath, "ocrdocs.json")
    }
    return Promise.resolve();
 }
@@ -64,6 +71,7 @@ Doc.prototype.checkImages = async function () {
    for (let p of this.pageImages) {
       //https://oversightmachin.es/overSSCIght/media/text/180515_0930_q-revanina-051518/180515_0930_q-revanina-051518_000.jpg
       let ps = p.replace("https://oversightmachin.es", "/mnt/oversee");
+      console.log(ps);
       if (!fs.existsSync(ps)) {
          this.imagesChecked = false;
          return Promise.reject();
@@ -73,11 +81,13 @@ Doc.prototype.checkImages = async function () {
    return Promise.resolve();
 }
 
-Doc.prototype.checkOCR = async function () {
-   let findingsUrl = "https://oversightmachin.es/findings/slash/";
-   let findingsPath = "/mnt/oversee/findings/slash/";
+Doc.prototype.checkOCR = async function (findingsPath, fn) {
    console.log(this);
    this.lastPage = {};
+   this.completedModes = [];
+   if (this.lastPage) {
+      delete this.lastPage;
+   }
    for (let m of this.modes) {
       this.lastPage[m] = 0;
       console.log("checking for", this.shortName, m);
@@ -85,19 +95,25 @@ Doc.prototype.checkOCR = async function () {
       if (fs.existsSync(fn)) {
          this.completedModes.push(m);
       }
-      for (let i = 0; i < this.pages; i++){
-	 let fn = `${findingsPath}${this.shortName}_${(i + "").padStart(3,"0")}_${m}.png`;
-	 console.log(fn);
-         if (fs.existsSync(fn)){
-	    console.log("found");
- 	    this.lastPage[m] = i;
-	 } else {
-	    console.log("not found");
-	 }
+      for (let i = 0; i < this.pages; i++) {
+         let fn = `${findingsPath}${this.shortName}_${(i + "").padStart(3, "0")}_${m}.png`;
+         console.log(fn);
+         if (fs.existsSync(fn)) {
+            console.log("found");
+            this.lastPage[m] = i;
+         } else {
+            console.log("not found");
+         }
       }
       console.log("last page ", this.lastPage[m]);
    }
    console.log(this.lastPage);
+   fs.writeFileSync(`${docspath}${fn}.json`, JSON.stringify(hDocs, undefined, 2));
+   let pages = 0;
+   for (let h of hDocs) {
+      pages += h.pages;
+   }
+   console.log(pages, " pages");
    return Promise.resolve();
 }
 
@@ -109,12 +125,7 @@ let doTheThing = async function () {
    console.log("checking docs");
    await checkHearDocs();
    console.log(hDocs.length, "docs");
-   fs.writeFileSync(`${docspath}hdocs.json`, JSON.stringify(hDocs, undefined, 2));
-   let pages = 0;
-   for (let h of hDocs){
-      pages+= h.pages;
-   }
-   console.log(pages, " pages");
+
 };
 
 doTheThing();
