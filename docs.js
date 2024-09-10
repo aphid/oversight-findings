@@ -29,43 +29,6 @@ let Doc = function (o, w, h) {
 }
 
 
-Doc.prototype.checkForCompletePDF = async function (){
-   let pdf = this
-   let outDir = "/mnt/oversee/findings/slash/"
-    //console.log(pdf);
-    let pageCount = pdf.metadata.pdfinfo.pages;
-    let pages = [];
-    let reduced = [];
-    let sofar = "none";
-    for (let m of this.mode){
-    for (let i = 0; i < pageCount; i++) {
-        let out = outDir + subpath + san(this.shortName + "_" + (i + "").padStart(3, "0") + "_" + m + ".png");
-        pages.push(out);
-        console.log("testing", out);
-        if (!fs.existsSync(out)) {
-            let theobj = {sofar: sofar}
-            if (i > 0) {
-                theobj.sofar = "incomplete";
-                pdf.lastPage = i - 1;
-            }
-
-            return Promise.resolve(theobj);
-        } else {
-            console.log("so far so good", out);
-
-        }
-      }
-    }
-    sofar = "full";
-    let pdfout = outDir + subpath + san(inData.title + "_" + inData.mode + ".pdf");
-    if (fs.existsSync(pdfout)) {
-        console.log("PDF exists");
-        return Promise.resolve({sofar: sofar});
-    }
-
-
-}
-
 let makeHearDocs = async function () {
    for (let hearing of full.hearings) {
       for (let witness of hearing.witnesses) {
@@ -87,7 +50,6 @@ let checkHearDocs = async function () {
       let cp = await h.checkPDF();
       let ci = await h.checkImages();
       let co = await h.checkOCR();
-      let cc = await.h.checkForCompletePDF();
    }
    return Promise.resolve();
 }
@@ -112,16 +74,30 @@ Doc.prototype.checkImages = async function () {
 }
 
 Doc.prototype.checkOCR = async function () {
-
    let findingsUrl = "https://oversightmachin.es/findings/slash/";
    let findingsPath = "/mnt/oversee/findings/slash/";
+   console.log(this);
+   this.lastPage = {};
    for (let m of this.modes) {
+      this.lastPage[m] = 0;
       console.log("checking for", this.shortName, m);
       let fn = `${findingsPath}${this.shortName}_${m}.pdf`
       if (fs.existsSync(fn)) {
          this.completedModes.push(m);
       }
+      for (let i = 0; i < this.pages; i++){
+	 let fn = `${findingsPath}${this.shortName}_${(i + "").padStart(3,"0")}_${m}.png`;
+	 console.log(fn);
+         if (fs.existsSync(fn)){
+	    console.log("found");
+ 	    this.lastPage[m] = i;
+	 } else {
+	    console.log("not found");
+	 }
+      }
+      console.log("last page ", this.lastPage[m]);
    }
+   console.log(this.lastPage);
    return Promise.resolve();
 }
 
@@ -134,6 +110,11 @@ let doTheThing = async function () {
    await checkHearDocs();
    console.log(hDocs.length, "docs");
    fs.writeFileSync(`${docspath}hdocs.json`, JSON.stringify(hDocs, undefined, 2));
+   let pages = 0;
+   for (let h of hDocs){
+      pages+= h.pages;
+   }
+   console.log(pages, " pages");
 };
 
 doTheThing();
