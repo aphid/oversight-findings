@@ -26,8 +26,6 @@ for (let d of dirs) {
     }
 }
 
-
-
 if (settings.privKey && settings.cert) {
     console.log("using https")
     encrypt = true;
@@ -55,7 +53,7 @@ var addPage = function (title, page) {
 };
 
 
-var server = method.createServer(serverOpts, function (req, res) {
+var server = method.createServer(serverOpts, async function (req, res) {
     console.log(moment().format());
     console.dir(req.param);
 
@@ -70,7 +68,7 @@ var server = method.createServer(serverOpts, function (req, res) {
         req.on('data', function (data) {
             body += data.toString();
         });
-        req.on('end', function () {
+        req.on('end', async function () {
             console.log(req.headers.referer);
             if (req.headers.referer) {
                 console.log("referer", req.headers.referer);
@@ -96,7 +94,7 @@ var server = method.createServer(serverOpts, function (req, res) {
                 let timestamp = moment().format("YYYY:MM:DD HH:mm:s.SSZ");
                 inData.author = ip;
                 inData.DateTimeDigitized = timestamp;
-                processOCR(inData);
+                await processOCR(inData);
             }
             res.writeHead(200, {
                 'Content-Type': 'text/html'
@@ -255,10 +253,11 @@ async function processOCR(inData) {
         console.log("doc incomplete");
         inData.lastPage = pdfprogress.lastPage;
         await updatehDocs(inData);
-    } else if (pdf.progress.sofar == "none") {
+    } else if (pdfprogress.sofar == "none") {
         console.log("doc hasn't been started");
     }
     console.log("finished");
+    await doTheThing();
 }
 
 let updatehDocs = async function (indata) {
@@ -384,7 +383,6 @@ async function checkForCompletePDF(inData, meta, subpath) {
     stream.on('finish', async function () {
         try {
             let ex = await exif.write(pdfout, pmeta, ['-overwrite_original', '-n']);
-            await doTheThing();
 
             return Promise.resolve({ sofar: sofar });
 
@@ -535,7 +533,8 @@ let Doc = function (o, w, h) {
 
 
 let makeHearDocs = async function () {
-    for (let hearing of full.hearings) {
+     hDocs = [];
+     for (let hearing of full.hearings) {
         console.log(hearing.shortName);
         for (let witness of hearing.witnesses) {
             for (let pdf of witness.pdfs) {
@@ -559,8 +558,9 @@ let checkHearDocs = async function () {
         console.log("checking images");
         let ci = await h.checkImages();
         console.log("checking ocr");
-        let co = await h.checkOCR(slashPath, "hdocs.json");
-        co = await h.checkOCR(ocrPath, "ocrdocs.json")
+        let co = await h.checkOCR(ocrPath, "ocrdocs.json")
+        co = await h.checkOCR(slashPath, "hdocs.json");
+
     }
     return Promise.resolve();
 }
@@ -589,9 +589,7 @@ Doc.prototype.checkOCR = async function (findingsPath, fn) {
     console.log(this);
     this.lastPage = {};
     this.completedModes = [];
-    if (this.lastPage) {
-        delete this.lastPage;
-    }
+    this.lastPage = [];
     for (let m of this.modes) {
         this.lastPage[m] = 0;
         console.log("checking for", this.shortName, m);
@@ -612,7 +610,7 @@ Doc.prototype.checkOCR = async function (findingsPath, fn) {
         console.log("last page ", this.lastPage[m]);
     }
     console.log(this.lastPage);
-    fs.writeFileSync(`${docspath}${fn}.json`, JSON.stringify(hDocs, undefined, 2));
+    fs.writeFileSync(`${docspath}${fn}`, JSON.stringify(hDocs, undefined, 2));
     let pages = 0;
     for (let h of hDocs) {
         pages += h.pages;
@@ -632,4 +630,9 @@ let doTheThing = async function () {
 
 };
 
+if (process.argv.indexOf('--dothething') > -1 ){
+
+    doTheThing();
+
+}
 
