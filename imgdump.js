@@ -279,7 +279,7 @@ let updatehDocs = async function (indata) {
         }
     }
     console.log("rewriting file");
-    fs.writeFileSync(fn, JSON.stringify(data, undefined, 2));
+    //fs.writeFileSync(fn, JSON.stringify(data, undefined, 2));
 }
 
 
@@ -558,10 +558,27 @@ let checkHearDocs = async function () {
         console.log("checking images");
         let ci = await h.checkImages();
         console.log("checking ocr");
-        let co = await h.checkOCR(ocrPath, "ocrdocs.json")
-        co = await h.checkOCR(slashPath, "hdocs.json");
-
     }
+    let ocrData = [...hDocs];
+    let slashData = [...hDocs];
+    for (let h of ocrData){
+        let co = await h.checkOCR(ocrPath, "ocrdocs.json");
+    }
+    console.log("ocrdata", ocrData[ocrData.length - 1].lastPage);
+    fs.writeFileSync(`${docspath}ocrdata.json`, JSON.stringify(ocrData, undefined, 2));
+    for (let h of slashData){
+        co = await h.checkOCR(slashPath, "slashhdocs.json");
+    }
+    console.log("slashdata", slashData[slashData.length - 1].lastPage);
+    console.log(JSON.stringify(slashData, undefined, 2));
+    fs.writeFileSync(`${docspath}slashdata.json`, JSON.stringify(slashData, undefined, 2));
+
+      let pages = 0;
+    for (let h of hDocs) {
+        pages += h.pages;
+    }
+    console.log(pages, " pages");
+
     return Promise.resolve();
 }
 
@@ -587,9 +604,8 @@ Doc.prototype.checkImages = async function () {
 
 Doc.prototype.checkOCR = async function (findingsPath, fn) {
     console.log(this);
-    this.lastPage = {};
     this.completedModes = [];
-    this.lastPage = [];
+    this.lastPage = {};
     for (let m of this.modes) {
         this.lastPage[m] = 0;
         console.log("checking for", this.shortName, m);
@@ -607,15 +623,13 @@ Doc.prototype.checkOCR = async function (findingsPath, fn) {
                 console.log("not found");
             }
         }
+	if (!this.lastPage[m]){
+	    this.lastPage[m] = 0;
+	}
         console.log("last page ", this.lastPage[m]);
     }
-    console.log(this.lastPage);
-    fs.writeFileSync(`${docspath}${fn}`, JSON.stringify(hDocs, undefined, 2));
-    let pages = 0;
-    for (let h of hDocs) {
-        pages += h.pages;
-    }
-    console.log(pages, " pages");
+    //console.log(this.lastPage);
+
     return Promise.resolve();
 }
 
