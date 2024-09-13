@@ -562,10 +562,7 @@ let checkHearDocs = async function () {
     fs.writeFileSync(`${docspath}ocrdata.json`, JSON.stringify(ocrData, undefined, 2));
     for (let h of slashData) {
         co = await h.checkOCR(slashPath, "slashhdocs.json");
-        //await util.wait(5000);
         let rr = await h.checkForCompletePDF("slash");
-        //await util.wait(5000);
-
     }
     console.log("slashdata", slashData[slashData.length - 1].lastPage);
     //console.log(JSON.stringify(slashData, undefined, 2));
@@ -609,7 +606,6 @@ Doc.prototype.checkOCR = async function (findingsPath, fn) {
         let fn = `${findingsPath}${this.shortName}_${m}.pdf`
         if (fs.existsSync(fn)) {
 	    console.log("found", fn);
-	    await util.wait(5000);
             this.completedModes.push(m);
         }
         for (let i = 0; i < this.pages; i++) {
@@ -767,11 +763,3 @@ Doc.prototype.renderPDF = async function (pages, mode, subpath) {
 }
 
 
-util = {};
-util.wait = async function (ms) {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            resolve();
-        }, (ms));
-    });
-};
