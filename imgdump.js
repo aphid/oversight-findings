@@ -245,12 +245,7 @@ async function processOCR(inData) {
         console.log("no words");
     }
     console.log("checking for full pdf");
-    let pdfprogress = await checkForCompletePDF(inData, meta, subpath);
-    console.log(pdfprogress);
-    if (pdfprogress && pdfprogress.lastPage){
-       inData.lastPage = pdfprogress.lastPage;
-    }
-    console.log("finished");
+    console.log("finished with ocr");
     await doTheThing();
     return Promise.resolve();
 }
@@ -303,7 +298,98 @@ function reduceWords(input) {
 }
 
 
+Doc.prototype.checkForCompletePDF = async function (exh, outDir) {
+    //these are what's in hdocs;
+    let subpath = "/mnt/oversee/findings/ocr/";
+    if (exh === "slash") {
+        subpath = "/mnt/oversee/findings/slash/";
+    }
 
+    let pdfout = outDir + subpath + this.shortName + "_" + inData.mode + ".pdf";
+    if (fs.existsSync(pdfout)) {
+        this.rendition = true;
+        return Promise.resolve("complete");
+    }
+
+    let complete;
+    for (let m of this.completedModes) {
+        let pages = [];
+        for (let i = 0; i < this.pages; i++) {
+            let img = `${outdir}${subpath}${this.shortName}_${(i + "").padStart(3, "0")}_${m}.png`;
+            if (!fs.existsSync(img)) {
+                complete = false;
+            }
+
+            
+        }
+        if (!complete) {
+            this.rendition = false;
+            return Promise.resolve("incomplete");
+        }
+        await this.renderPDF(pages, reduced)
+    }
+
+}
+
+Doc.prototype.renderPDF = async function (pages) {
+    let pdfout = outDir + subpath + this.shortName + "_" + inData.mode + ".pdf";
+    let meta = fs.readFileSync(pdfout.replace(".pdf", ".json"));
+    meta = JSON.parse(read);
+    let reduced = [];
+    let doc = new pdfkit({
+        autoFirstPage: false
+    });
+    let stream = fs.createWriteStream(pdfout);
+    doc.pipe(stream);
+
+    for (let page of pages) {
+        console.log("adding page", page);
+        doc.addPage({
+            size: 'letter'
+        });
+        doc.rect(0, 0, doc.page.width, doc.page.height).fill('#16161d'); //eigengrau background
+        doc.image(page, 0, 0, {
+            fit: [doc.page.width, doc.page.height]
+        });
+        let imgmeta = await exif.read(page);
+        //console.log(imgmeta);
+        if (imgmeta.DerivedFrom.RenditionClass) {
+            reduced.push.apply(reduced, JSON.parse(imgmeta.DerivedFrom.RenditionClass));
+        }
+        let metadata = JSON.parse(fs.readFileSync(page.replace("png","json")));
+        if (metadata){
+            reduced.push.apply(reduced, metadata.reduced);
+        }
+
+    }
+    console.log("metaaaa");
+    pmeta = {};
+    pmeta.author = meta.author;
+    pmeta.owner = meta.owner;
+    //pmeta.timestamp = meta.timestamp;
+    pmeta.DerivedFromRenditionClass = JSON.stringify(reduced);
+    pmeta.GPSLatitude = meta["exif:GPSLatitude"];
+    pmeta.GPSLatitudeRef = meta["exif:GPSLatitudeRef"];
+    pmeta.GPSLongitude = meta["exif:GPSLongitude"];
+    pmeta.GPSLongitudeRef = meta["exif:GPSLongitudeRef"];
+    //pdfout = pdfout.replace(".pdf", "_m.pdf");
+    doc.end();
+    //console.log(pmeta);
+    stream.on('finish', async function () {
+        try {
+            let ex = await exif.write(pdfout, pmeta, ['-overwrite_original', '-n']);
+            console.log("writing metadata");
+            return Promise.resolve({ sofar: sofar });
+
+            //console.log(ex);
+        } catch (e) {
+            //console.log(e);
+            throw (e);
+        }
+        //if we got this far, make a PDF;
+    });
+
+}
 
 async function checkForCompletePDF(inData, meta, subpath) {
     let pdf = await pdfFromID(inData.title);
@@ -348,7 +434,7 @@ async function checkForCompletePDF(inData, meta, subpath) {
     doc.pipe(stream);
 
     for (let page of pages) {
-	console.log("adding page");
+        console.log("adding page");
         doc.addPage({
             size: 'letter'
         });
@@ -379,7 +465,7 @@ async function checkForCompletePDF(inData, meta, subpath) {
     stream.on('finish', async function () {
         try {
             let ex = await exif.write(pdfout, pmeta, ['-overwrite_original', '-n']);
-	    console.log("writing metadata");
+            console.log("writing metadata");
             return Promise.resolve({ sofar: sofar });
 
             //console.log(ex);
@@ -529,8 +615,8 @@ let Doc = function (o, w, h) {
 
 
 let makeHearDocs = async function () {
-     hDocs = [];
-     for (let hearing of full.hearings) {
+    hDocs = [];
+    for (let hearing of full.hearings) {
         console.log(hearing.shortName);
         for (let witness of hearing.witnesses) {
             for (let pdf of witness.pdfs) {
@@ -554,22 +640,24 @@ let checkHearDocs = async function () {
         console.log("checking images");
         let ci = await h.checkImages();
         console.log("checking ocr");
+        let rr = await h.checkForCompletePDF();
     }
     let ocrData = [...hDocs];
     let slashData = [...hDocs];
-    for (let h of ocrData){
+    for (let h of ocrData) {
         let co = await h.checkOCR(ocrPath, "ocrdocs.json");
+        let rr = await h.checkForCompletePDF(ocrPath);
     }
     console.log("ocrdata", ocrData[ocrData.length - 1].lastPage);
     fs.writeFileSync(`${docspath}ocrdata.json`, JSON.stringify(ocrData, undefined, 2));
-    for (let h of slashData){
+    for (let h of slashData) {
         co = await h.checkOCR(slashPath, "slashhdocs.json");
+        let rr = await h.checkForCompletePDF(ocrPath);
     }
     console.log("slashdata", slashData[slashData.length - 1].lastPage);
     //console.log(JSON.stringify(slashData, undefined, 2));
     fs.writeFileSync(`${docspath}slashdata.json`, JSON.stringify(slashData, undefined, 2));
-
-      let pages = 0;
+    let pages = 0;
     for (let h of hDocs) {
         pages += h.pages;
     }
@@ -619,14 +707,14 @@ Doc.prototype.checkOCR = async function (findingsPath, fn) {
                 console.log("not found");
             }
         }
-	if (!this.lastPage[m]){
-	    this.lastPage[m] = 0;
-	}
-	if (this.lastPage[m] === this.pages - 1){
+        if (!this.lastPage[m]) {
+            this.lastPage[m] = 0;
+        }
+        if (this.lastPage[m] === this.pages - 1) {
 
             this.completedModes.push(m);
-	    console.log("complete!", m);
-	}
+            console.log("complete!", m);
+        }
         console.log("last page ", this.lastPage[m]);
     }
     //console.log(this.lastPage);
@@ -645,7 +733,7 @@ let doTheThing = async function () {
 
 };
 
-if (process.argv.indexOf('--dothething') > -1 ){
+if (process.argv.indexOf('--dothething') > -1) {
 
     doTheThing();
 
