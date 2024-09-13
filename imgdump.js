@@ -556,7 +556,7 @@ let checkHearDocs = async function () {
     let ocrData = [...hDocs];
     let slashData = [...hDocs];
     for (let h of ocrData) {
-        //let co = await h.checkOCR(ocrPath, "ocrdocs.json");
+        let co = await h.checkOCR(ocrPath, "ocrdocs.json");
     }
     console.log("ocrdata", ocrData[ocrData.length - 1].lastPage);
     fs.writeFileSync(`${docspath}ocrdata.json`, JSON.stringify(ocrData, undefined, 2));
