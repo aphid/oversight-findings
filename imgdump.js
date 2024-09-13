@@ -298,99 +298,6 @@ function reduceWords(input) {
 }
 
 
-Doc.prototype.checkForCompletePDF = async function (exh, outDir) {
-    //these are what's in hdocs;
-    let subpath = "/mnt/oversee/findings/ocr/";
-    if (exh === "slash") {
-        subpath = "/mnt/oversee/findings/slash/";
-    }
-
-    let pdfout = outDir + subpath + this.shortName + "_" + inData.mode + ".pdf";
-    if (fs.existsSync(pdfout)) {
-        this.rendition = true;
-        return Promise.resolve("complete");
-    }
-
-    let complete;
-    for (let m of this.completedModes) {
-        let pages = [];
-        for (let i = 0; i < this.pages; i++) {
-            let img = `${outdir}${subpath}${this.shortName}_${(i + "").padStart(3, "0")}_${m}.png`;
-            if (!fs.existsSync(img)) {
-                complete = false;
-            }
-
-            
-        }
-        if (!complete) {
-            this.rendition = false;
-            return Promise.resolve("incomplete");
-        }
-        await this.renderPDF(pages, reduced)
-    }
-
-}
-
-Doc.prototype.renderPDF = async function (pages) {
-    let pdfout = outDir + subpath + this.shortName + "_" + inData.mode + ".pdf";
-    let meta = fs.readFileSync(pdfout.replace(".pdf", ".json"));
-    meta = JSON.parse(read);
-    let reduced = [];
-    let doc = new pdfkit({
-        autoFirstPage: false
-    });
-    let stream = fs.createWriteStream(pdfout);
-    doc.pipe(stream);
-
-    for (let page of pages) {
-        console.log("adding page", page);
-        doc.addPage({
-            size: 'letter'
-        });
-        doc.rect(0, 0, doc.page.width, doc.page.height).fill('#16161d'); //eigengrau background
-        doc.image(page, 0, 0, {
-            fit: [doc.page.width, doc.page.height]
-        });
-        let imgmeta = await exif.read(page);
-        //console.log(imgmeta);
-        if (imgmeta.DerivedFrom.RenditionClass) {
-            reduced.push.apply(reduced, JSON.parse(imgmeta.DerivedFrom.RenditionClass));
-        }
-        let metadata = JSON.parse(fs.readFileSync(page.replace("png","json")));
-        if (metadata){
-            reduced.push.apply(reduced, metadata.reduced);
-        }
-
-    }
-    console.log("metaaaa");
-    pmeta = {};
-    pmeta.author = meta.author;
-    pmeta.owner = meta.owner;
-    //pmeta.timestamp = meta.timestamp;
-    pmeta.DerivedFromRenditionClass = JSON.stringify(reduced);
-    pmeta.GPSLatitude = meta["exif:GPSLatitude"];
-    pmeta.GPSLatitudeRef = meta["exif:GPSLatitudeRef"];
-    pmeta.GPSLongitude = meta["exif:GPSLongitude"];
-    pmeta.GPSLongitudeRef = meta["exif:GPSLongitudeRef"];
-    //pdfout = pdfout.replace(".pdf", "_m.pdf");
-    doc.end();
-    //console.log(pmeta);
-    stream.on('finish', async function () {
-        try {
-            let ex = await exif.write(pdfout, pmeta, ['-overwrite_original', '-n']);
-            console.log("writing metadata");
-            return Promise.resolve({ sofar: sofar });
-
-            //console.log(ex);
-        } catch (e) {
-            //console.log(e);
-            throw (e);
-        }
-        //if we got this far, make a PDF;
-    });
-
-}
-
 async function checkForCompletePDF(inData, meta, subpath) {
     let pdf = await pdfFromID(inData.title);
     //console.log(pdf);
@@ -739,3 +646,96 @@ if (process.argv.indexOf('--dothething') > -1) {
 
 }
 
+
+Doc.prototype.checkForCompletePDF = async function (exh, outDir) {
+    //these are what's in hdocs;
+    let subpath = "/mnt/oversee/findings/ocr/";
+    if (exh === "slash") {
+        subpath = "/mnt/oversee/findings/slash/";
+    }
+
+    let pdfout = outDir + subpath + this.shortName + "_" + inData.mode + ".pdf";
+    if (fs.existsSync(pdfout)) {
+        this.rendition = true;
+        return Promise.resolve("complete");
+    }
+
+    let complete;
+    for (let m of this.completedModes) {
+        let pages = [];
+        for (let i = 0; i < this.pages; i++) {
+            let img = `${outdir}${subpath}${this.shortName}_${(i + "").padStart(3, "0")}_${m}.png`;
+            if (!fs.existsSync(img)) {
+                complete = false;
+            }
+
+            
+        }
+        if (!complete) {
+            this.rendition = false;
+            return Promise.resolve("incomplete");
+        }
+        await this.renderPDF(pages, reduced)
+    }
+
+}
+
+Doc.prototype.renderPDF = async function (pages) {
+    let pdfout = outDir + subpath + this.shortName + "_" + inData.mode + ".pdf";
+    let meta = fs.readFileSync(pdfout.replace(".pdf", ".json"));
+    meta = JSON.parse(read);
+    let reduced = [];
+    let doc = new pdfkit({
+        autoFirstPage: false
+    });
+    let stream = fs.createWriteStream(pdfout);
+    doc.pipe(stream);
+
+    for (let page of pages) {
+        console.log("adding page", page);
+        doc.addPage({
+            size: 'letter'
+        });
+        doc.rect(0, 0, doc.page.width, doc.page.height).fill('#16161d'); //eigengrau background
+        doc.image(page, 0, 0, {
+            fit: [doc.page.width, doc.page.height]
+        });
+        let imgmeta = await exif.read(page);
+        //console.log(imgmeta);
+        if (imgmeta.DerivedFrom.RenditionClass) {
+            reduced.push.apply(reduced, JSON.parse(imgmeta.DerivedFrom.RenditionClass));
+        }
+        let metadata = JSON.parse(fs.readFileSync(page.replace("png","json")));
+        if (metadata){
+            reduced.push.apply(reduced, metadata.reduced);
+        }
+
+    }
+    console.log("metaaaa");
+    pmeta = {};
+    pmeta.author = meta.author;
+    pmeta.owner = meta.owner;
+    //pmeta.timestamp = meta.timestamp;
+    pmeta.DerivedFromRenditionClass = JSON.stringify(reduced);
+    pmeta.GPSLatitude = meta["exif:GPSLatitude"];
+    pmeta.GPSLatitudeRef = meta["exif:GPSLatitudeRef"];
+    pmeta.GPSLongitude = meta["exif:GPSLongitude"];
+    pmeta.GPSLongitudeRef = meta["exif:GPSLongitudeRef"];
+    //pdfout = pdfout.replace(".pdf", "_m.pdf");
+    doc.end();
+    //console.log(pmeta);
+    stream.on('finish', async function () {
+        try {
+            let ex = await exif.write(pdfout, pmeta, ['-overwrite_original', '-n']);
+            console.log("writing metadata");
+            return Promise.resolve({ sofar: sofar });
+
+            //console.log(ex);
+        } catch (e) {
+            //console.log(e);
+            throw (e);
+        }
+        //if we got this far, make a PDF;
+    });
+
+}
