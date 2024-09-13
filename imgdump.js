@@ -246,18 +246,13 @@ async function processOCR(inData) {
     }
     console.log("checking for full pdf");
     let pdfprogress = await checkForCompletePDF(inData, meta, subpath);
-    if (pdfprogress.sofar == "complete") {
-        console.log("doc is complete");
-        await updatehDocs(inData);
-    } else if (pdfprogress.sofar == "partial") {
-        console.log("doc incomplete");
-        inData.lastPage = pdfprogress.lastPage;
-        await updatehDocs(inData);
-    } else if (pdfprogress.sofar == "none") {
-        console.log("doc hasn't been started");
+    console.log(pdfprogress);
+    if (pdfprogress && pdfprogress.lastPage){
+       inData.lastPage = pdfprogress.lastPage;
     }
     console.log("finished");
     await doTheThing();
+    return Promise.resolve();
 }
 
 let updatehDocs = async function (indata) {
@@ -275,7 +270,7 @@ let updatehDocs = async function (indata) {
     for (let d of data) {
         if (indata.title === d.shortName && !d.completedModes.includes(indata.mode)) {
             d.completedModes.push(indata.mode);
-            console.log(d);
+            //console.log(d);
         }
     }
     console.log("rewriting file");
@@ -353,6 +348,7 @@ async function checkForCompletePDF(inData, meta, subpath) {
     doc.pipe(stream);
 
     for (let page of pages) {
+	console.log("adding page");
         doc.addPage({
             size: 'letter'
         });
@@ -383,7 +379,7 @@ async function checkForCompletePDF(inData, meta, subpath) {
     stream.on('finish', async function () {
         try {
             let ex = await exif.write(pdfout, pmeta, ['-overwrite_original', '-n']);
-
+	    console.log("writing metadata");
             return Promise.resolve({ sofar: sofar });
 
             //console.log(ex);
@@ -570,7 +566,7 @@ let checkHearDocs = async function () {
         co = await h.checkOCR(slashPath, "slashhdocs.json");
     }
     console.log("slashdata", slashData[slashData.length - 1].lastPage);
-    console.log(JSON.stringify(slashData, undefined, 2));
+    //console.log(JSON.stringify(slashData, undefined, 2));
     fs.writeFileSync(`${docspath}slashdata.json`, JSON.stringify(slashData, undefined, 2));
 
       let pages = 0;
@@ -603,7 +599,7 @@ Doc.prototype.checkImages = async function () {
 }
 
 Doc.prototype.checkOCR = async function (findingsPath, fn) {
-    console.log(this);
+    //console.log(this);
     this.completedModes = [];
     this.lastPage = {};
     for (let m of this.modes) {
@@ -625,6 +621,11 @@ Doc.prototype.checkOCR = async function (findingsPath, fn) {
         }
 	if (!this.lastPage[m]){
 	    this.lastPage[m] = 0;
+	}
+	if (this.lastPage[m] === this.pages - 1){
+
+            this.completedModes.push(m);
+	    console.log("complete!", m);
 	}
         console.log("last page ", this.lastPage[m]);
     }
