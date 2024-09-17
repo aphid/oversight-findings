@@ -439,7 +439,7 @@ async function hearingFromID(title) {
     console.log("hfi", title);
     console.log(data.data);
     */
-    let data = JSON.parse(fs.readFileSync("data.json"));
+    let data = JSON.parse(fs.readFileSync("/var/www/oversightmachin.es/html/ocr/mixedup.json"));
     for (let h of data.hearings) {
         if (h.witnesses) {
             for (let w of h.witnesses) {
@@ -502,7 +502,7 @@ let ocrPath = "/mnt/oversee/findings/ocr/"
 
 hDocs = [];
 let getData = async function () {
-    let f = fs.readFileSync("data.json");
+    let f = fs.readFileSync("/var/www/oversightmachin.es/html/ocr/mixedup.json");
     full = JSON.parse(f);
 }
 
