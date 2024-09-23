@@ -8,6 +8,7 @@ var crypto = require('crypto');
 var moment = require("moment");
 var axios = require('axios');
 var exif = require("exiftool-vendored").exiftool;
+var sizeOf = require("image-size");
 var settings = fs.readFileSync("settings.json");
 settings = JSON.parse(settings);
 console.log(settings);
@@ -158,8 +159,14 @@ async function processUnburn(data) {
     //addPage(inData.title, inData.page);*/
 }
 
+async function writeLog(msg){
+    let log = fs.readFileSync("log.txt", "utf8");
+    log = log + "\n" + new Date().toString() + ": " + msg;
+    fs.writeFileSync("log.txt", log, "utf8");
+};
 
 async function processOCR(inData) {
+   
     console.log(inData.title, inData.root);
     //var ip = req.socket.remoteAddress;
     //var hash = crypto.createHash('md5').update(ip + new Date().toTimeString()).digest('hex');
@@ -168,14 +175,17 @@ async function processOCR(inData) {
     let meta = {};
     let hearing = await hearingFromID(inData.title);
     //console.log(inData);
-    console.log(hearing);
+    //console.log(hearing);
     let witness = hearing.witness;
     hearing = hearing.hearing;
+    writeLog("OCR for " + hearing.shortName + " " + inData.exh);
     let subpath = "ocr/";
     if (inData.exh === "slash" || inData.exhibition === "slash") {
         subpath = "slash/";
     }
-    let outpattern = outDir + `${subpath}${san(inData.title)}_${(inData.page + "").padStart(3, "0")}_${inData.mode}`;
+    let sanTitle = san(inData.title);
+    let pageNum = (inData.page + "").padStart(3, "0");
+    let outpattern = outDir + `${subpath}${sanTitle}_${pageNum}_${inData.mode}`;
     console.log(subpath);
     let location;
     if (hearing.location.includes("Hart")) {
@@ -189,6 +199,9 @@ async function processOCR(inData) {
     if (inData.pageImg) {
         console.log("IMAGE");
         let out = outpattern + ".png";
+	let img = inData.pageImg.replace(/^data:image\/png;base64,/, "");
+        let testimg = `/mnt/oversee/overSSCIght/media/text/${sanTitle}/${sanTitle}_${pageNum}.png`;
+ 	//todo test image dimensions against existing page	
         console.log(out);
         meta.author = inData.author;
         //meta.timestamp = inData.timestamp;
@@ -196,15 +209,14 @@ async function processOCR(inData) {
         if (witness.org) {
             meta.ownerName += ", " + witness.org;
         }
-
+        
         if (!fs.existsSync(out)) {
-            var img = inData.pageImg.replace(/^data:image\/png;base64,/, "");
             fs.writeFileSync(out, img, 'base64');
             console.log("writing ", out);
             reduced = reduceWords(inData.words);
             console.log("reduced: ", reduced);
             console.log(inData.timestamp);
-
+	    writeLog("wrote image: " + out);
             meta.DerivedFromRenditionClass = JSON.stringify(reduced);
 
         }
@@ -240,6 +252,7 @@ async function processOCR(inData) {
                 "words": inData.words
 
             }, undefined, 2), "utf8");
+	    writeLog("wrote json: " + out);
         }
     } else {
         console.log("no words");
@@ -342,12 +355,15 @@ async function checkForCompletePDF(inData, meta, subpath) {
 
     for (let page of pages) {
         console.log("adding page");
+	let img = pdf.openImage(page);
         doc.addPage({
-            size: 'letter'
+		size: 'letter', margin: 54
         });
         //doc.rect(0, 0, doc.page.width, doc.page.height).fill('#16161d'); //eigengrau background
-        doc.image(page, 0, 0, {
-            fit: [doc.page.width, doc.page.height]
+        doc.image(img, 0, 0, {
+            fit: [doc.page.width - 54, doc.page.height - 54],
+	    align: 'center',
+	    valign: 'center'
         });
         let imgmeta = await exif.read(page);
         //console.log(imgmeta);
@@ -459,7 +475,7 @@ async function hearingFromID(title) {
             }
         }
     }
-    console.log("no data", url);
+    console.log("no data");
 }
 
 
@@ -561,7 +577,7 @@ let checkHearDocs = async function () {
     console.log("ocrdata", ocrData[ocrData.length - 1].lastPage);
     fs.writeFileSync(`${docspath}ocrdata.json`, JSON.stringify(ocrData, undefined, 2));
     for (let h of slashData) {
-        co = await h.checkOCR(slashPath, "slashhdocs.json");
+        co = await h.checkOCR(slashPath, "slashdocs.json");
         let rr = await h.checkForCompletePDF("slash");
     }
     console.log("slashdata", slashData[slashData.length - 1].lastPage);
@@ -604,7 +620,7 @@ Doc.prototype.checkOCR = async function (findingsPath, fn) {
         this.lastPage[m] = 0;
         console.log("checking for", this.shortName, m);
         let fn = `${findingsPath}${this.shortName}_${m}.pdf`
-        if (fs.existsSync(fn)) {
+        if (fs.existsSync(fn) && !this.completedModes.includes(m)) {
 	    console.log("found", fn);
             this.completedModes.push(m);
         }
@@ -621,7 +637,7 @@ Doc.prototype.checkOCR = async function (findingsPath, fn) {
         if (!this.lastPage[m]) {
             this.lastPage[m] = 0;
         }
-        if (this.lastPage[m] === this.pages - 1) {
+        if (this.lastPage[m] === this.pages - 1 && !this.completedModes.includes(m)) {
 
             this.completedModes.push(m);
             console.log("complete!", m);
@@ -696,8 +712,11 @@ Doc.prototype.checkForCompletePDF = async function (exh, mode) {
 
 Doc.prototype.renderPDF = async function (pages, mode, subpath) {
     let pdfout = outDir + subpath + this.shortName + "_" + mode + ".pdf";
-    
+    let thedoc = this; 
     let reduced = [];
+    if (fs.existsSync(pdfout) && fs.existsSync(pdfout + ".json")){
+        return Promise.resolve();
+    }
     let doc = new pdfkit({
         autoFirstPage: false
     });
@@ -710,7 +729,7 @@ Doc.prototype.renderPDF = async function (pages, mode, subpath) {
         doc.addPage({
             size: 'letter'
         });
-        doc.rect(0, 0, doc.page.width, doc.page.height).fill('#16161d'); //eigengrau background
+        //doc.rect(0, 0, doc.page.width, doc.page.height).fill('#16161d'); //eigengrau background
         doc.image(page, 0, 0, {
             fit: [doc.page.width, doc.page.height]
         });
@@ -733,7 +752,11 @@ Doc.prototype.renderPDF = async function (pages, mode, subpath) {
     pmeta.Creator = "operational character rendition 0.1.2409";
     //pmeta.timestamp = meta.timestamp;
     pmeta.DerivedFromRenditionClass = JSON.stringify(reduced);
-    pmeta.GPSPosition = meta["GPSPosition"];
+    if (subpath.includes("slash")){
+       pmeta.GPSPosition = "37.753330866446966, -122.39040924766917";
+    } else { 
+       pmeta.GPSPosition = meta["GPSPosition"];
+    }
     //pmeta.GPSLatitudeRef = meta["GPSLatitudeRef"];
     //pmeta.GPSLongitude = meta["GPSLongitude"];
     //pmeta.GPSLongitudeRef = meta["GPSLongitudeRef"];
@@ -746,8 +769,15 @@ Doc.prototype.renderPDF = async function (pages, mode, subpath) {
             console.log("writing metadata");
 	    let jsonout = pdfout.replace(".pdf", ".pdf.json");
             console.log("checking", jsonout);
+	    let cdoc = structuredClone(thedoc);
+	    delete cdoc.pageImages;
+	    delete cdoc.localPath;
+	    delete cdoc.hearing.shortname;
+	    delete cdoc.shortName;
+	    delete cdoc.hearing.shorttime;
+	    delete cdoc.hearing.shortdate;
             if (!fs.existsSync(jsonout)){
-                fs.writeFileSync(jsonout, JSON.stringify(pmeta, undefined, 2));
+                fs.writeFileSync(jsonout, JSON.stringify({document: cdoc, findings: pmeta}, undefined, 2));
             } 
 
             return Promise.resolve();
