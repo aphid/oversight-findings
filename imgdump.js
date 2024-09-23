@@ -4,7 +4,6 @@ var method = http;
 var pdfkit = require('pdfkit')
 var san = require("sanitize-filename");
 var fs = require('fs');
-var crypto = require('crypto');
 var moment = require("moment");
 var axios = require('axios');
 var exif = require("exiftool-vendored").exiftool;
@@ -14,11 +13,9 @@ settings = JSON.parse(settings);
 console.log(settings);
 var outDir = settings.outDir;
 var hearingsFile = settings.hearingsFile;
-var encrypt;
 var serverOpts = {};
 console.log(hearingsFile)
 var hearings = JSON.parse(fs.readFileSync(hearingsFile));
-
 var dirs = ["ocr", "spu", "unburn", "slash"];
 for (let d of dirs) {
     let target = outDir + "/" + d + "/";
@@ -29,7 +26,6 @@ for (let d of dirs) {
 
 if (settings.privKey && settings.cert) {
     console.log("using https")
-    encrypt = true;
     method = https;
     serverOpts.key = fs.readFileSync(settings.privKey);
     serverOpts.cert = fs.readFileSync(settings.cert);
@@ -121,7 +117,6 @@ async function processUnburn(data) {
     var out = `${outDir}unburn/${data.unburnCode}/${id}.png`;
     console.log(id);
     console.log(out);
-    let md;
 
 
     var img = data.image.replace(/^data:image\/png;base64,/, "");
@@ -159,14 +154,14 @@ async function processUnburn(data) {
     //addPage(inData.title, inData.page);*/
 }
 
-async function writeLog(msg){
+async function writeLog(msg) {
     let log = fs.readFileSync("log.txt", "utf8");
     log = log + "\n" + new Date().toString() + ": " + msg;
     fs.writeFileSync("log.txt", log, "utf8");
 };
 
 async function processOCR(inData) {
-   
+
     console.log(inData.title, inData.root);
     //var ip = req.socket.remoteAddress;
     //var hash = crypto.createHash('md5').update(ip + new Date().toTimeString()).digest('hex');
@@ -199,9 +194,10 @@ async function processOCR(inData) {
     if (inData.pageImg) {
         console.log("IMAGE");
         let out = outpattern + ".png";
-	let img = inData.pageImg.replace(/^data:image\/png;base64,/, "");
+        let img = inData.pageImg.replace(/^data:image\/png;base64,/, "");
         let testimg = `/mnt/oversee/overSSCIght/media/text/${sanTitle}/${sanTitle}_${pageNum}.png`;
- 	//todo test image dimensions against existing page	
+        console.log(sizeOf(testimg));
+        //todo test image dimensions against existing page	
         console.log(out);
         meta.author = inData.author;
         //meta.timestamp = inData.timestamp;
@@ -209,14 +205,14 @@ async function processOCR(inData) {
         if (witness.org) {
             meta.ownerName += ", " + witness.org;
         }
-        
+
         if (!fs.existsSync(out)) {
             fs.writeFileSync(out, img, 'base64');
             console.log("writing ", out);
             reduced = reduceWords(inData.words);
             console.log("reduced: ", reduced);
             console.log(inData.timestamp);
-	    writeLog("wrote image: " + out);
+            writeLog("wrote image: " + out);
             meta.DerivedFromRenditionClass = JSON.stringify(reduced);
 
         }
@@ -228,7 +224,7 @@ async function processOCR(inData) {
 
             //meta["GPSPosition"] = `${location[0]} ${location[1]}`;
         }
-        let ex = await exif.write(out, meta, ['-overwrite_original', '-n']);
+        await exif.write(out, meta, ['-overwrite_original', '-n']);
         //console.log(ex);
         addPage(inData.title, inData.page);
     }
@@ -252,7 +248,7 @@ async function processOCR(inData) {
                 "words": inData.words
 
             }, undefined, 2), "utf8");
-	    writeLog("wrote json: " + out);
+            writeLog("wrote json: " + out);
         }
     } else {
         console.log("no words");
@@ -262,29 +258,6 @@ async function processOCR(inData) {
     await doTheThing();
     return Promise.resolve();
 }
-
-let updatehDocs = async function (indata) {
-    console.log("updating hdocs");
-    let fn;
-    if (indata.exhibition === "slash" || indata.exh === "slash") {
-        fn = "/var/www/oversightmachin.es/html/ocr/hdocs.json";
-
-    } else {
-        fn = "/var/www/oversightmachin.es/html/ocr/ocrdocs.json";
-
-    }
-    let data = fs.readFileSync(fn);
-    data = JSON.parse(data);
-    for (let d of data) {
-        if (indata.title === d.shortName && !d.completedModes.includes(indata.mode)) {
-            d.completedModes.push(indata.mode);
-            //console.log(d);
-        }
-    }
-    console.log("rewriting file");
-    //fs.writeFileSync(fn, JSON.stringify(data, undefined, 2));
-}
-
 
 
 function reduceWords(input) {
@@ -308,101 +281,6 @@ function reduceWords(input) {
         }
     }
     return reduced;
-}
-
-
-async function checkForCompletePDF(inData, meta, subpath) {
-    let pdf = await pdfFromID(inData.title);
-    //console.log(pdf);
-    let pageCount = pdf.pdfinfo.pages;
-    let pages = [];
-    let reduced = [];
-    let sofar = "none";
-    for (let i = 0; i < pageCount; i++) {
-        let out = outDir + subpath + san(inData.title + "_" + (i + "").padStart(3, "0") + "_" + inData.mode + ".png");
-        pages.push(out);
-        console.log("testing", out);
-        if (!fs.existsSync(out)) {
-            let theobj = { sofar: sofar }
-            if (i > 0) {
-                theobj.sofar = "incomplete";
-                theobj.lastPage = i - 1;
-            }
-
-            return Promise.resolve(theobj);
-        } else {
-            console.log("so far so good", out);
-            let read = fs.readFileSync(out.replace("png", "json"));
-            if (read) {
-                read = JSON.parse(read);
-                reduced.push.apply(reduced, read.reduced);
-            }
-        }
-    }
-    sofar = "full";
-    let pdfout = outDir + subpath + san(inData.title + "_" + inData.mode + ".pdf");
-    if (fs.existsSync(pdfout)) {
-        console.log("PDF exists");
-        return Promise.resolve({ sofar: sofar });
-    }
-    //make this a different function tho.
-    console.log("time to make a PDF");
-    let doc = new pdfkit({
-        autoFirstPage: false
-    });
-    let stream = fs.createWriteStream(pdfout);
-    doc.pipe(stream);
-
-    for (let page of pages) {
-        console.log("adding page");
-	let img = pdf.openImage(page);
-        doc.addPage({
-		size: 'letter', margin: 54
-        });
-        //doc.rect(0, 0, doc.page.width, doc.page.height).fill('#16161d'); //eigengrau background
-        doc.image(img, 0, 0, {
-            fit: [doc.page.width - 54, doc.page.height - 54],
-	    align: 'center',
-	    valign: 'center'
-        });
-        let imgmeta = await exif.read(page);
-        //console.log(imgmeta);
-        if (imgmeta.DerivedFrom.RenditionClass) {
-            reduced.push.apply(reduced, JSON.parse(imgmeta.DerivedFrom.RenditionClass));
-        }
-
-    }
-    console.log("metaaaa");
-    pmeta = {};
-    pmeta.author = meta.author;
-    pmeta.owner = meta.owner;
-    //pmeta.timestamp = meta.timestamp;
-    pmeta.DerivedFromRenditionClass = JSON.stringify(reduced);
-    pmeta.GPSLatitude = meta["exif:GPSLatitude"];
-    pmeta.GPSLatitudeRef = meta["exif:GPSLatitudeRef"];
-    pmeta.GPSLongitude = meta["exif:GPSLongitude"];
-    pmeta.GPSLongitudeRef = meta["exif:GPSLongitudeRef"];
-    //pdfout = pdfout.replace(".pdf", "_m.pdf");
-    doc.end();
-    //console.log(pmeta);
-    stream.on('finish', async function () {
-        try {
-            let ex = await exif.write(pdfout, pmeta, ['-overwrite_original', '-n']);
-	    let jsonout = pdfout.replace(".pdf", ".pdf.json");
-	    console.log("checking", jsonout);
-	    if (!fs.existsSync(jsonout)){
-                fs.writeFileSyinc(jsonout, JSON.stringify(pmeta, undefined, 2));
-	    }
-            console.log("writing metadata");
-            return Promise.resolve();
-
-            //console.log(ex);
-        } catch (e) {
-            //console.log(e);
-            throw (e);
-        }
-        //if we got this far, make a PDF;
-    });
 }
 
 let wait = async function (ms) {
@@ -432,29 +310,18 @@ async function pdfFromID(title) {
     let url = "https://oversightmachin.es/overSSCIght/media/text/" + found.localName + ".json";
     console.log("fetching", url);
     let data;
-    try {
-        data = await axios(url);
-    } catch (e) {
-        throw (e);
+    data = await axios(url);
+    if (data) {
+        console.log("ok");
+        //console.log(data.data);
+        return Promise.resolve(data.data);
+    } else {
+        console.log("no data", url);
+        return Promise.reject();
     }
-    console.log("ok");
-    //console.log(data.data);
-    return Promise.resolve(data.data);
-    console.log("no data", url);
 }
 
 async function hearingFromID(title) {
-    /* let url = "https://oversightmachin.es/overSSCIght/data/240903_11.json";
-    let data;
-    try {
-        data = await axios.get(url);
-    } catch (e) {
-        throw (e.response);
-    }
-    //console.log(data.data);
-    console.log("hfi", title);
-    console.log(data.data);
-    */
     let data = JSON.parse(fs.readFileSync("/var/www/oversightmachin.es/html/ocr/mixedup.json"));
     for (let h of data.hearings) {
         if (h.witnesses) {
@@ -503,7 +370,7 @@ function processSpu(data) {
     fs.writeFileSync(datafile, JSON.stringify(send));
 
 }
-port = 3000;
+let port = 3000;
 server.listen(port);
 console.log('Listening at http://' + ':' + port);
 
@@ -511,7 +378,7 @@ console.log('Listening at http://' + ':' + port);
 
 
 
-let full, docs, hDocs;
+let full, hDocs;
 let docspath = "/var/www/oversightmachin.es/html/ocr/";
 let slashPath = "/mnt/oversee/findings/slash/";
 let ocrPath = "/mnt/oversee/findings/ocr/"
@@ -564,21 +431,21 @@ let makeHearDocs = async function () {
 let checkHearDocs = async function () {
     for (let h of hDocs) {
         console.log("checking pdf");
-        let cp = await h.checkPDF();
+        await h.checkPDF();
         console.log("checking images");
-        let ci = await h.checkImages();
+        await h.checkImages();
         console.log("checking ocr");
     }
     let ocrData = [...hDocs];
     let slashData = [...hDocs];
     for (let h of ocrData) {
-        let co = await h.checkOCR(ocrPath, "ocrdocs.json");
+        await h.checkOCR(ocrPath);
     }
     console.log("ocrdata", ocrData[ocrData.length - 1].lastPage);
     fs.writeFileSync(`${docspath}ocrdata.json`, JSON.stringify(ocrData, undefined, 2));
     for (let h of slashData) {
-        co = await h.checkOCR(slashPath, "slashdocs.json");
-        let rr = await h.checkForCompletePDF("slash");
+        await h.checkOCR(slashPath);
+        await h.checkForCompletePDF("slash");
     }
     console.log("slashdata", slashData[slashData.length - 1].lastPage);
     //console.log(JSON.stringify(slashData, undefined, 2));
@@ -612,7 +479,7 @@ Doc.prototype.checkImages = async function () {
     return Promise.resolve();
 }
 
-Doc.prototype.checkOCR = async function (findingsPath, fn) {
+Doc.prototype.checkOCR = async function (findingsPath) {
     //console.log(this);
     this.completedModes = [];
     this.lastPage = {};
@@ -621,7 +488,7 @@ Doc.prototype.checkOCR = async function (findingsPath, fn) {
         console.log("checking for", this.shortName, m);
         let fn = `${findingsPath}${this.shortName}_${m}.pdf`
         if (fs.existsSync(fn) && !this.completedModes.includes(m)) {
-	    console.log("found", fn);
+            console.log("found", fn);
             this.completedModes.push(m);
         }
         for (let i = 0; i < this.pages; i++) {
@@ -650,6 +517,7 @@ Doc.prototype.checkOCR = async function (findingsPath, fn) {
 }
 
 let doTheThing = async function () {
+    await wait(50);
     console.log("getting data");
     await getData();
     console.log("making docs");
@@ -661,7 +529,6 @@ let doTheThing = async function () {
 };
 
 if (process.argv.indexOf('--dothething') > -1) {
-
     doTheThing();
 
 }
@@ -670,7 +537,7 @@ if (process.argv.indexOf('--dothething') > -1) {
 Doc.prototype.checkForCompletePDF = async function (exh, mode) {
     console.log("checking PDF");
 
-	//these are what's in hdocs;
+    //these are what's in hdocs;
     let outDir = "/mnt/oversee/findings/"
     let subpath = "ocr/";
     if (exh === "slash") {
@@ -680,7 +547,7 @@ Doc.prototype.checkForCompletePDF = async function (exh, mode) {
     let pdfout = outDir + subpath + this.shortName + "_" + mode + ".pdf";
     if (fs.existsSync(pdfout)) {
         this.rendition = true;
-	console.log("it's complete!");
+        console.log("it's complete!");
         return Promise.resolve("complete");
     } else {
         console.log("rendered PDF is missing");
@@ -688,23 +555,23 @@ Doc.prototype.checkForCompletePDF = async function (exh, mode) {
 
     let complete = true;
     for (let m of this.completedModes) {
-	console.log("trying", m);
+        console.log("trying", m);
         let pages = [];
         for (let i = 0; i < this.pages; i++) {
             let img = `${outDir}${subpath}${this.shortName}_${(i + "").padStart(3, "0")}_${m}.png`;
             if (!fs.existsSync(img)) {
-		console.log("expected", img);
+                console.log("expected", img);
                 complete = false;
             } else {
-		pages.push(img);
-	    }
+                pages.push(img);
+            }
         }
-	console.log("complete?", complete);
+        console.log("complete?", complete);
         if (!complete) {
             this.rendition = false;
             return Promise.resolve("incomplete");
         }
-	console.log("rendering PDF from complete imageset");
+        console.log("rendering PDF from complete imageset");
         await this.renderPDF(pages, m, subpath)
     }
 
@@ -712,9 +579,9 @@ Doc.prototype.checkForCompletePDF = async function (exh, mode) {
 
 Doc.prototype.renderPDF = async function (pages, mode, subpath) {
     let pdfout = outDir + subpath + this.shortName + "_" + mode + ".pdf";
-    let thedoc = this; 
+    let thedoc = this;
     let reduced = [];
-    if (fs.existsSync(pdfout) && fs.existsSync(pdfout + ".json")){
+    if (fs.existsSync(pdfout) && fs.existsSync(pdfout + ".json")) {
         return Promise.resolve();
     }
     let doc = new pdfkit({
@@ -738,24 +605,24 @@ Doc.prototype.renderPDF = async function (pages, mode, subpath) {
         if (imgmeta.DerivedFrom.RenditionClass) {
             reduced.push.apply(reduced, JSON.parse(imgmeta.DerivedFrom.RenditionClass));
         }
-        let metadata = JSON.parse(fs.readFileSync(page.replace("png","json")));
-        if (metadata){
+        let metadata = JSON.parse(fs.readFileSync(page.replace("png", "json")));
+        if (metadata) {
             reduced.push.apply(reduced, metadata.reduced);
         }
 
     }
     console.log("metaaaa");
     console.log("metaaaa");
-    pmeta = {};
+    let pmeta = {};
     pmeta.Author = meta.Author;
     pmeta.Owner = meta.OwnerName;
     pmeta.Creator = "operational character rendition 0.1.2409";
     //pmeta.timestamp = meta.timestamp;
     pmeta.DerivedFromRenditionClass = JSON.stringify(reduced);
-    if (subpath.includes("slash")){
-       pmeta.GPSPosition = "37.753330866446966, -122.39040924766917";
-    } else { 
-       pmeta.GPSPosition = meta["GPSPosition"];
+    if (subpath.includes("slash")) {
+        pmeta.GPSPosition = "37.753330866446966, -122.39040924766917";
+    } else {
+        pmeta.GPSPosition = meta["GPSPosition"];
     }
     //pmeta.GPSLatitudeRef = meta["GPSLatitudeRef"];
     //pmeta.GPSLongitude = meta["GPSLongitude"];
@@ -764,30 +631,23 @@ Doc.prototype.renderPDF = async function (pages, mode, subpath) {
     doc.end();
     //console.log(pmeta);
     stream.on('finish', async function () {
-        try {
-            let ex = await exif.write(pdfout, pmeta, ['-overwrite_original', '-n']);
-            console.log("writing metadata");
-	    let jsonout = pdfout.replace(".pdf", ".pdf.json");
-            console.log("checking", jsonout);
-	    let cdoc = structuredClone(thedoc);
-	    delete cdoc.pageImages;
-	    delete cdoc.localPath;
-	    delete cdoc.hearing.shortname;
-	    delete cdoc.shortName;
-	    delete cdoc.hearing.shorttime;
-	    delete cdoc.hearing.shortdate;
-            if (!fs.existsSync(jsonout)){
-                fs.writeFileSync(jsonout, JSON.stringify({document: cdoc, findings: pmeta}, undefined, 2));
-            } 
 
-            return Promise.resolve();
-
-            //console.log(ex);
-        } catch (e) {
-            //console.log(e);
-            throw (e);
+        await exif.write(pdfout, pmeta, ['-overwrite_original', '-n']);
+        console.log("writing metadata");
+        let jsonout = pdfout.replace(".pdf", ".pdf.json");
+        console.log("checking", jsonout);
+        let cdoc = structuredClone(thedoc);
+        delete cdoc.pageImages;
+        delete cdoc.localPath;
+        delete cdoc.hearing.shortname;
+        delete cdoc.shortName;
+        delete cdoc.hearing.shorttime;
+        delete cdoc.hearing.shortdate;
+        if (!fs.existsSync(jsonout)) {
+            fs.writeFileSync(jsonout, JSON.stringify({ document: cdoc, findings: pmeta }, undefined, 2));
         }
-        //if we got this far, make a PDF;
+
+        return Promise.resolve();
     });
 
 }
