@@ -4,7 +4,7 @@ var method = http;
 var pdfkit = require('pdfkit')
 var san = require("sanitize-filename");
 var fs = require('fs');
-var moment = require("moment");
+var dayjs = require("dayjs");
 var axios = require('axios');
 var exif = require("exiftool-vendored").exiftool;
 var sizeOf = require("image-size");
@@ -51,7 +51,7 @@ var addPage = function (title, page) {
 
 
 var server = method.createServer(serverOpts, async function (req, res) {
-    console.log(moment().format());
+    console.log(dayjs().format());
     console.dir(req.param);
 
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -88,7 +88,7 @@ var server = method.createServer(serverOpts, async function (req, res) {
                 //it's ocr
                 console.log("OCR");
                 let ip = req.socket.remoteAddress;
-                let timestamp = moment().format("YYYY:MM:DD HH:mm:s.SSZ");
+                let timestamp = dayjs().format("YYYY:MM:DD HH:mm:s.SSZ");
                 inData.author = ip;
                 inData.DateTimeDigitized = timestamp;
                 await processOCR(inData);
