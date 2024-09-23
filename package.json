@@ -1,9 +1,1 @@
-{
-  "dependencies": {
-    "axios": "^1.7.7",
-    "exiftool-vendored": "^15.6.0",
-    "moment": "^2.29.1",
-    "pdfkit": "^0.13.0",
-    "sanitize-filename": "^1.6.3"
-  }
-}
+{"dependencies":{"axios":"^1.7.7","exiftool-vendored":"^15.6.0","image-size":"^1.1.1","moment":"^2.29.1","pdf-merge":"^1.2.0","pdf-merger-js":"^4.3.1","pdfkit":"^0.15.0","puppeteer":"^23.3.1","sanitize-filename":"^1.6.3"}}
