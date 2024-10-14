@@ -2,20 +2,35 @@ let fs = require('fs');
 let puppeteer = require('puppeteer');
 const PDFMerge = require('pdf-merge');
 let exif = require("exiftool-vendored").exiftool;
+let slashDir = "/mnt/oversee/findings/slash/";
+let printDir = slashDir + "print/";
+let queue = [];
+for (let i of fs.readdirSync("/mnt/oversee/findings/slash/")){
+   console.log(i);
+   if (i.includes(".pdf") && !i.includes(".json") && !fs.existsSync(printDir + i)){
+      console.log("processing " + i);
+      queue.push(slashDir + i);
+   }
 
+}
+console.log("----------------------------------------------------------");
+console.log(queue);
+//process.exit();
 
-let title = "/mnt/oversee/findings/slash/171101_0930_Exhibits_used_by_Vice_Chairman_Warner_during_the_2017-11-01_hearing_tesseract_2.1.1.pdf";
-let metaFontSize = 18;
+//let title = "/mnt/oversee/findings/slash/171101_0930_Exhibits_used_by_Chairman_Burr_during_the_2017-11-01_hearing_tesseract_2.1.1.pdf";
+let metaFontSize;
 let dothething = async function(){
-    await mergePDFs(title, metaFontSize);
-    process.exit();
+    for (let title of queue){
+      metaFontSize = 18;
+      await mergePDFs(title, metaFontSize);
+    }
 }
 
-let mergePDFs = async function(pdft, fontsize = 9){
+let mergePDFs = async function(pdft, fontsize){
     //page length at sizes.  9: 5243  10.5?: 2966
-    console.log("lets goooo");
+    console.log("starting ", pdft, " at ", fontsize);
     let theJSON = fs.readFileSync(`${pdft}.json`, "utf8").replace(/\\/g, "");
-    let browser = await puppeteer.launch();
+    let browser = await puppeteer.launch({timeout: 0});
     let page = await browser.newPage();
     page.on('console', async (msg) => {
         const msgArgs = msg.args();
@@ -47,6 +62,7 @@ let mergePDFs = async function(pdft, fontsize = 9){
     if (tmpmeta.PageCount > 25 && metaFontSize > 8){
        metaFontSize = metaFontSize - 0.5;
        console.log("new size " + metaFontSize);
+       await browser.close();
        return mergePDFs(pdft, metaFontSize);
     }
 
